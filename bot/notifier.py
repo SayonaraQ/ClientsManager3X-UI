@@ -1,11 +1,15 @@
 # bot/notifier.py
+import os
 from aiogram import Bot
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime, timezone
+
 from bot.api import get_all_clients
 from bot.utils import get_expiry_datetime, is_expiring_soon
-import os
 
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")  # Должен быть задан в .env без @
+# Загружаем данные из .env
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
+ADMIN_GREETING_TEXT = os.getenv("ADMIN_GREETING_TEXT")
 
 async def notify_users(bot: Bot):
     try:
@@ -24,14 +28,26 @@ async def notify_users(bot: Bot):
                 continue
 
             try:
+                # Создаем кнопку для обращения к админу
+                button = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text="💬 Написать админу",
+                                url=f"tg://resolve?domain={ADMIN_USERNAME}&text={ADMIN_GREETING_TEXT.replace(' ', '%20')}"
+                            )
+                        ]
+                    ]
+                )
+
                 await bot.send_message(
                     chat_id=tg_id,
                     text=(
                         "⚠️ <b>Ваша подписка скоро закончится!</b>\n\n"
-                        f"📅 Дата окончания: <b>{expiry.strftime('%d.%m.%Y %H:%M')}</b>\n\n"
-                        f"💬 Чтобы продлить доступ, напишите <a href='https://t.me/{ADMIN_USERNAME}'>админу</a>."
+                        f"📅 Дата окончания: <code>{expiry.strftime('%d.%m.%Y %H:%M')}</code>\n\n"
+                        "💬 Чтобы продлить доступ, нажмите кнопку ниже."
                     ),
-                    disable_web_page_preview=True
+                    reply_markup=button
                 )
                 notified += 1
             except Exception as e:
