@@ -15,7 +15,17 @@ def generate_email(tg_id: int) -> str:
     return f"trial_{tg_id}"
 
 def generate_expiry(days: int = 3) -> int:
-    return int((datetime.now(timezone.utc) + timedelta(days=days)).timestamp() * 1000)
+    """Генерирует дату истечения подписки через N дней в 23:59:59 по московскому времени"""
+    moscow_tz = ZoneInfo("Europe/Moscow")
+    now_msk = datetime.now(moscow_tz)
+
+    target_date = (now_msk + timedelta(days=days)).replace(
+        hour=23, minute=59, second=59, microsecond=0
+    )
+
+    target_date_utc = target_date.astimezone(timezone.utc)
+
+    return int(target_date_utc.timestamp() * 1000)
 
 def get_expiry_datetime(ms: int) -> datetime:
     try:

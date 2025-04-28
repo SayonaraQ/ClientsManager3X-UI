@@ -131,3 +131,53 @@ async def add_trial_user(inbound_id: int, tg_id: int):
 
 async def test_api_connection() -> bool:
     return await login() and (await get_inbounds() is not None)
+
+async def update_user_expiry(client_id: str, new_expiry_time: int) -> bool:
+    try:
+        session = await get_session()
+
+        # Загружаем все inbounds
+        inbounds = await get_inbounds()
+        if not inbounds:
+            print("[api.py] ❌ Не удалось получить inbounds для продления пользователя")
+            return False
+
+        # Ищем клиента по его id
+        for inbound in inbounds:
+            try:
+                settings = json.loads(inbound.get("settings", "{}"))
+                for client in settings.get("clients", []):
+                    if client.get("id") == client_id:
+                        # Нашли клиента, меняем expiryTime
+                        client["expiryTime"] = new_expiry_time
+
+                        # Отправляем только данные клиента на updateClient
+                        async with session.post(
+                            f"{XUI_API_URL}/panel/inbound/updateClient",
+                            data={
+                                "id": client["id"],
+                                "settings": json.dumps(client),
+                            },
+                            cookies=cookies
+                        ) as resp:
+                            try:
+                                result = await resp.json()
+                                success = result.get("success", False)
+                                if success:
+                                    print(f"[api.py] ✅ Успешно продлили подписку для клиента {client_id}")
+                                else:
+                                    print(f"[api.py] ❌ Ошибка продления для клиента {client_id}: {result}")
+                                return success
+                            except Exception as e:
+                                text = await resp.text()
+                                print(f"[api.py] ❌ Ошибка при чтении ответа продления: {e}, текст:\n{text}")
+                                return False
+            except Exception as e:
+                print(f"[api.py] ⚠️ Ошибка при обработке inbound в продлении: {e}")
+
+        print(f"[api.py] ❌ Клиент с id {client_id} не найден в базе.")
+        return False
+
+    except Exception as e:
+        print(f"[api.py] ❌ Ошибка в prolong_user: {e}")
+        return False

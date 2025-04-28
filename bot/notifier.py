@@ -3,7 +3,6 @@ import os
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime, timezone
-
 from bot.api import get_all_clients
 from bot.utils import get_expiry_datetime, is_expiring_soon
 
@@ -31,12 +30,8 @@ async def notify_users(bot: Bot):
                 # Создаем кнопку для обращения к админу
                 button = InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text="💬 Написать админу",
-                                url=f"tg://resolve?domain={ADMIN_USERNAME}&text={ADMIN_GREETING_TEXT.replace(' ', '%20')}"
-                            )
-                        ]
+                        [InlineKeyboardButton(text="🔁 Продлить подписку", callback_data="renew_subscription")],
+                        [InlineKeyboardButton(text="💬 Написать админу", url=f"tg://resolve?domain={ADMIN_USERNAME}&text={ADMIN_GREETING_TEXT.replace(' ', '%20')}")]
                     ]
                 )
 
@@ -45,7 +40,7 @@ async def notify_users(bot: Bot):
                     text=(
                         "⚠️ <b>Ваша подписка скоро закончится!</b>\n\n"
                         f"📅 Дата окончания: <code>{expiry.strftime('%d.%m.%Y %H:%M')}</code>\n\n"
-                        "💬 Чтобы продлить доступ, нажмите кнопку ниже."
+                        "💬 Чтобы продлить доступ, нажмите одну из кнопок ниже."
                     ),
                     reply_markup=button
                 )

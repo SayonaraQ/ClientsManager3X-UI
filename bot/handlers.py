@@ -1,16 +1,25 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 
-from bot.api import find_user_by_tg, add_trial_user, get_inbounds
-from bot.utils import get_expiry_datetime
+from bot.api import find_user_by_tg, add_trial_user, get_inbounds, update_user_expiry
+from bot.utils import generate_uuid, generate_sub_id, generate_email, generate_expiry, get_expiry_datetime, is_admin
 
 router = Router()
+
+ADMIN_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")  # Куда уведомлять админа
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 SUB_LINK_TEMPLATE = os.getenv("SUB_LINK_TEMPLATE")
 
+YOOMONEY_LINKS = {
+    "1": os.getenv("YOOMONEY_LINK_1"),
+    "3": os.getenv("YOOMONEY_LINK_3"),
+    "6": os.getenv("YOOMONEY_LINK_6")
+}
+
+# /start команда
 @router.message(Command("start"))
 async def start_handler(message: Message):
     tg_id = message.from_user.id
@@ -25,19 +34,22 @@ async def start_handler(message: Message):
                 expiry_str = dt.strftime("%d.%m.%Y %H:%M")
         await message.answer(
             "👋 Добро пожаловать! Ваша подписка активна.\n"
-            f"📅 Дата окончания: <b>{expiry_str}</b>\n\n"
-            f"🔔Я напомню о необходимости продления за день до истечения срока действия подписки."
+            f"📅 Дата окончания: <b>{expiry_str}</b>\n"
+            "Я напомню вам о необходимости продления за сутки до истечения срока действия подписки."
         )
     else:
         kb = InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(text="Получить доступ", callback_data="get_trial")]]
+            inline_keyboard=[
+                [InlineKeyboardButton(text="Получить доступ", callback_data="get_trial")]
+            ]
         )
         await message.answer(
-            "👋 Привет! Похоже, у вас ещё нет подписки на самый лучший VPN.\n"
-            "Хотите получить бесплатный пробный доступ на 3 дня?\n",
+            "👋 Привет! Похоже, у вас ещё нет подписки на наш VPN.\n"
+            "Хотите получить бесплатный пробный доступ на 3 дня?",
             reply_markup=kb
         )
 
+# Кнопка получения триала
 @router.callback_query(F.data == "get_trial")
 async def handle_get_trial(callback: CallbackQuery):
     tg_id = callback.from_user.id
@@ -46,7 +58,7 @@ async def handle_get_trial(callback: CallbackQuery):
         await callback.message.answer("❌ Не удалось получить информацию о VPN. Попробуйте позже.")
         return
 
-    inbound = inbounds[0]  # Берем первый доступный inbound
+    inbound = inbounds[0]
 
     success, sub_id, expiry_ms = await add_trial_user(inbound["id"], tg_id)
     if not success:
@@ -66,3 +78,85 @@ async def handle_get_trial(callback: CallbackQuery):
         f"Если возникнут вопросы или понадобится помощь — пишите <a href='https://t.me/{ADMIN_USERNAME}'>админу</a>.",
         disable_web_page_preview=True
     )
+
+
+
+# Кнопка "Продлить подписку" в уведомлении
+async def send_payment_options(tg_id: int, bot):
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Оплатить 1 месяц (200₽)", url=YOOMONEY_LINKS["1"])],
+            [InlineKeyboardButton(text="Оплатить 3 месяца (600₽)", url=YOOMONEY_LINKS["3"])],
+            [InlineKeyboardButton(text="Оплатить 6 месяцев (1800₽)", url=YOOMONEY_LINKS["6"])],
+            [InlineKeyboardButton(text="✅ Я оплатил", callback_data="payment_done")]
+        ]
+    )
+    await bot.send_message(
+        chat_id=tg_id,
+        text=(
+            "💳 Для продления подписки выберите вариант оплаты:\n\n"
+            "После оплаты нажмите кнопку <b>✅ Я оплатил</b>."
+        ),
+        reply_markup=kb
+    )
+
+# Обработка "✅ Я оплатил"
+@router.callback_query(F.data == "payment_done")
+async def handle_payment_done(callback: CallbackQuery):
+    tg_id = callback.from_user.id
+    username = callback.from_user.username or "Без username"
+
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Продлить на 1 месяц", callback_data=f"extend_1_{tg_id}"),
+                InlineKeyboardButton(text="Продлить на 3 месяца", callback_data=f"extend_3_{tg_id}"),
+                InlineKeyboardButton(text="Продлить на 6 месяцев", callback_data=f"extend_6_{tg_id}"),
+            ]
+        ]
+    )
+
+    await callback.message.answer("✅ Спасибо! Ваше подтверждение отправлено администратору.")
+
+    await callback.bot.send_message(
+        chat_id=ADMIN_CHAT_ID,
+        text=(
+            f"👤 Пользователь @{username} подтвердил оплату.\n"
+            f"Telegram ID: <code>{tg_id}</code>\n\n"
+            "Выберите срок продления:"
+        ),
+        reply_markup=kb
+    )
+
+# Обработка кнопок продления админом
+@router.callback_query(F.data.startswith("extend_"))
+async def handle_extend(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("⛔ У вас нет прав.", show_alert=True)
+        return
+
+    parts = callback.data.split("_")
+    months = int(parts[1])
+    tg_id = int(parts[2])
+
+    user = await find_user_by_tg(tg_id)
+    if not user:
+        await callback.message.answer("❌ Пользователь не найден.")
+        return
+
+    expiry_now = get_expiry_datetime(user["expiryTime"])
+    if not expiry_now:
+        expiry_now = datetime.now()
+
+    # Новая дата истечения
+    new_expiry = expiry_now + timedelta(days=30 * months)
+    new_expiry = new_expiry.replace(hour=23, minute=59, second=59, microsecond=0)
+
+    success = await update_user_expiry(user["inbound_id"], user["client"]["id"], int(new_expiry.timestamp() * 1000))
+
+    if success:
+        await callback.message.answer(
+            f"✅ Подписка пользователя <code>{tg_id}</code> продлена до {new_expiry.strftime('%d.%m.%Y %H:%M:%S')}"
+        )
+    else:
+        await callback.message.answer(f"❌ Ошибка при продлении пользователя <code>{tg_id}</code>.")
