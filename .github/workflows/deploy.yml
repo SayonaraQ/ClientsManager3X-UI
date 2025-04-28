@@ -33,7 +33,11 @@ jobs:
           cp docker-compose.yml backups/docker-compose.yml.$timestamp
 
           echo "🧹 Очищаем старые бэкапы, оставляем только последние 5"
-          ls -t backups/docker-compose.yml.* | tail -n +6 | xargs -r rm --
+          if ls backups/docker-compose.yml.* 1> /dev/null 2>&1; then
+            ls -t backups/docker-compose.yml.* | tail -n +6 | xargs -r rm --
+          else
+            echo "⚠️ Бэкапов пока нет — пропускаем очистку"
+          fi
 
           echo "🛑 Останавливаем старые контейнеры"
           docker compose down --remove-orphans || true
