@@ -35,7 +35,7 @@ async def start_handler(message: Message):
         await message.answer(
             "👋 Добро пожаловать! Ваша подписка активна.\n"
             f"📅 Дата окончания: <b>{expiry_str}</b>\n"
-            "Я напомню вам о необходимости продления за сутки до истечения срока действия подписки."
+            "Я напомню вам о необходимости продления за день до окончания подписки."
         )
     else:
         kb = InlineKeyboardMarkup(
@@ -93,7 +93,7 @@ async def handle_check_status(callback: CallbackQuery):
     tg_id = callback.from_user.id
     user = await find_user_by_tg(tg_id)
 
-    await callback.answer()  # Закрываем крутилку
+    await callback.answer()
 
     if user:
         expiry_ms = user.get("expiryTime")
@@ -103,9 +103,9 @@ async def handle_check_status(callback: CallbackQuery):
             if dt:
                 expiry_str = dt.strftime("%d.%m.%Y %H:%M")
         await callback.message.answer(
-            "🔎 Статус подписки:\n"
+            "🔎 Статус подписки: <b>Активна</b>\n"
             f"📅 Дата окончания: <b>{expiry_str}</b>\n\n"
-            "❗ Я напомню вам о необходимости продления за сутки до окончания."
+            "❗ Я напомню вам о необходимости продления за день до окончания подписки."
         )
     else:
         await callback.message.answer(
@@ -144,15 +144,15 @@ async def handle_payment_choice(callback: CallbackQuery):
 
     await callback.message.answer(
         text=f"💸 Перейдите по ссылке для оплаты:\n{link}\n\n"
-             "После оплаты нажмите кнопку <b>✅ Я оплатил</b>.",
+             "После оплаты нажмите кнопку <b>✅ Подтвердить оплату</b>.",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="✅ Я оплатил", callback_data="payment_done")]
+                [InlineKeyboardButton(text="✅ Подтвердить оплату", callback_data="payment_done")]
             ]
         )
     )
 
-# Обработка "✅ Я оплатил"
+# Обработка "✅ Подтвердить оплату"
 @router.callback_query(F.data == "payment_done")
 async def handle_payment_done(callback: CallbackQuery):
     tg_id = callback.from_user.id
