@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from datetime import datetime, timedelta
 import os
 
-from bot.api import find_user_by_tg, add_trial_user, get_inbounds, update_user_expiry
+from bot.api import find_user_by_tg, add_trial_user, get_inbounds, prolong_user
 from bot.utils import generate_uuid, generate_sub_id, generate_email, generate_expiry, get_expiry_datetime, is_admin
 
 router = Router()
@@ -59,6 +59,17 @@ async def handle_get_trial(callback: CallbackQuery):
         return
 
     inbound = inbounds[0]
+    client = {
+        "id": generate_uuid(),
+        "email": generate_email(tg_id),
+        "enable": True,
+        "expiryTime": generate_expiry(),
+        "flow": "xtls-rprx-vision",
+        "limitIp": 2,
+        "reset": 0,
+        "tgId": tg_id,
+        "subId": generate_sub_id()
+    }
 
     success, sub_id, expiry_ms = await add_trial_user(inbound["id"], tg_id)
     if not success:
@@ -75,36 +86,55 @@ async def handle_get_trial(callback: CallbackQuery):
         f"✅ Используйте её в вашем VPN-клиенте.\n"
         f"Инструкция по подключению: https://telegra.ph/Instrukciya-po-nastrojke-nashego-VPN-09-11-2\n"
         f"Стоимость подписки после пробного периода - 200р/месяц\n\n"
-        f"Если возникнут вопросы или понадобится помощь — пишите <a href='https://t.me/{ADMIN_USERNAME}'>админу</a>.",
+        f"Если возникнут вопросы — пишите <a href='https://t.me/{ADMIN_USERNAME}'>админу</a>.",
         disable_web_page_preview=True
     )
 
-
-
-# Кнопка "Продлить подписку" в уведомлении
+# Кнопка "Продлить подписку" (первый этап)
 async def send_payment_options(tg_id: int, bot):
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Оплатить 1 месяц (200₽)", url=YOOMONEY_LINKS["1"])],
-            [InlineKeyboardButton(text="Оплатить 3 месяца (600₽)", url=YOOMONEY_LINKS["3"])],
-            [InlineKeyboardButton(text="Оплатить 6 месяцев (1800₽)", url=YOOMONEY_LINKS["6"])],
-            [InlineKeyboardButton(text="✅ Я оплатил", callback_data="payment_done")]
+            [
+                InlineKeyboardButton(text="1 месяц (200₽)", callback_data="pay_1"),
+                InlineKeyboardButton(text="3 месяца (600₽)", callback_data="pay_3"),
+                InlineKeyboardButton(text="6 месяцев (1200₽)", callback_data="pay_6"),
+            ]
         ]
     )
     await bot.send_message(
         chat_id=tg_id,
-        text=(
-            "💳 Для продления подписки выберите вариант оплаты:\n\n"
-            "После оплаты нажмите кнопку <b>✅ Я оплатил</b>."
-        ),
+        text="💳 Выберите срок продления подписки:",
         reply_markup=kb
     )
 
-# Обработка "✅ Я оплатил"
+# Обработка выбора срока оплаты
+@router.callback_query(F.data.startswith("pay_"))
+async def handle_payment_choice(callback: CallbackQuery):
+    choice = callback.data.split("_")[1]
+
+    link = YOOMONEY_LINKS.get(choice)
+    if not link:
+        await callback.answer("❌ Ошибка, неверный вариант оплаты.")
+        return
+
+    # Отправляем ссылку для оплаты и кнопку "✅ Подтвердить оплату"
+    await callback.message.answer(
+        text=f"💸 Перейдите по ссылке для оплаты:\n{link}\n\n"
+             "После оплаты нажмите кнопку <b>✅ Подтвердить оплату</b>.",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="✅ Подтвердить оплату", callback_data="payment_done")]
+            ]
+        )
+    )
+
+# Обработка "✅ Подтвердить оплату"
 @router.callback_query(F.data == "payment_done")
 async def handle_payment_done(callback: CallbackQuery):
     tg_id = callback.from_user.id
     username = callback.from_user.username or "Без username"
+
+    await callback.message.edit_reply_markup()  # Удаляем кнопки
 
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -128,7 +158,7 @@ async def handle_payment_done(callback: CallbackQuery):
         reply_markup=kb
     )
 
-# Обработка кнопок продления админом
+# Обработка продления админом
 @router.callback_query(F.data.startswith("extend_"))
 async def handle_extend(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
@@ -152,7 +182,9 @@ async def handle_extend(callback: CallbackQuery):
     new_expiry = expiry_now + timedelta(days=30 * months)
     new_expiry = new_expiry.replace(hour=23, minute=59, second=59, microsecond=0)
 
-    success = await update_user_expiry(user["inbound_id"], user["client"]["id"], int(new_expiry.timestamp() * 1000))
+    success = await prolong_user(user["client"]["id"], int(new_expiry.timestamp() * 1000))
+
+    await callback.message.edit_reply_markup()  # Удаляем кнопки
 
     if success:
         await callback.message.answer(
