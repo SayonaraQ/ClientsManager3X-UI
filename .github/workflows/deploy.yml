@@ -1,4 +1,4 @@
-name: Deploy ClientsManager3X-UI to VPS
+name: 🔥 Deploy to VPS
 
 on:
   push:
@@ -7,30 +7,56 @@ on:
 
 jobs:
   deploy:
-    name: 🔥 Deploy to VPS
+    name: Deploy to VPS
     runs-on: ubuntu-latest
 
     steps:
-      - name: ✅ Checkout repository
-        uses: actions/checkout@v4
+    - name: ✅ Checkout repository
+      uses: actions/checkout@v4
 
-      - name: 🔑 Setup SSH
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+    - name: 🔑 Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: 🚀 Deploy to VPS
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
-            set -e
-            echo "📂 Переходим в папку проекта"
-            cd /home/ClientsManager3X-UI
+    - name: 🚀 Deploy to server
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.USER }}@${{ secrets.HOST }} << 'EOF'
+          set -e
 
-            echo "🔄 Делаем git pull"
-            git pull
+          echo "📂 Переходим в папку проекта"
+          cd /home/ClientsManager3X-UI
 
-            echo "🐳 Пересобираем и перезапускаем контейнеры"
+          echo "📦 Делаем бэкап docker-compose.yml"
+          mkdir -p backups
+          timestamp=$(date +"%Y%m%d%H%M%S")
+          cp docker-compose.yml backups/docker-compose.yml.$timestamp
+
+          echo "🧹 Очищаем старые бэкапы, оставляем только последние 5"
+          ls -t backups/docker-compose.yml.* | tail -n +6 | xargs -r rm --
+
+          echo "🛑 Останавливаем старые контейнеры"
+          docker compose down --remove-orphans || true
+
+          echo "🔄 Обновляем код"
+          git pull
+
+          echo "🐳 Пуллим новые образы"
+          docker compose pull
+
+          echo "🚀 Перезапускаем контейнеры"
+          if docker compose up -d --build; then
+            echo "✅ Деплой успешно завершен"
+            curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+              -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+              -d text="✅ Успешный деплой VPN-клиента завершён!"
+          else
+            echo "❌ Деплой не удался! Восстанавливаем бэкап..."
+            cp backups/$(ls -t backups | head -n 1) docker-compose.yml
             docker compose up -d --build
-
-            echo "✅ Деплой завершён успешно!"
-          EOF
+            curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+              -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+              -d text="❌ Ошибка деплоя VPN-клиента! Выполнен откат на предыдущую версию."
+            exit 1
+          fi
+        EOF
