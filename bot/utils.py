@@ -1,7 +1,6 @@
 import uuid
 import random
 import string
-import time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -16,32 +15,26 @@ def generate_email(tg_id: int) -> str:
 
 def generate_expiry(days: int = 3) -> int:
     """Генерирует дату истечения подписки через N дней в 23:59:59 по московскому времени"""
-    moscow_tz = ZoneInfo("Europe/Moscow")
-    now_msk = datetime.now(moscow_tz)
-
+    now_msk = datetime.now(ZoneInfo("Europe/Moscow"))
     target_date = (now_msk + timedelta(days=days)).replace(
         hour=23, minute=59, second=59, microsecond=0
     )
-
     target_date_utc = target_date.astimezone(timezone.utc)
-
     return int(target_date_utc.timestamp() * 1000)
 
 def get_expiry_datetime(ms: int) -> datetime:
+    """Преобразует метку времени в datetime по московскому времени"""
     try:
-        return datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
+        return datetime.fromtimestamp(ms / 1000, tz=ZoneInfo("Europe/Moscow"))
     except Exception:
         return None
 
 def is_expiring_soon(expiry: datetime) -> bool:
-    """ Проверка: истекает сегодня или завтра """
+    """Проверяет, истекает ли подписка сегодня или завтра"""
     now_msk = datetime.now(ZoneInfo("Europe/Moscow"))
-    expiry_msk = expiry.astimezone(ZoneInfo("Europe/Moscow"))
-
     today = now_msk.date()
     tomorrow = today + timedelta(days=1)
-
-    return expiry_msk.date() in (today, tomorrow)
+    return expiry.date() in (today, tomorrow)
 
 def is_admin(tg_id: int) -> bool:
     from os import getenv
@@ -49,7 +42,7 @@ def is_admin(tg_id: int) -> bool:
 
 def timestamp_to_date(ts: int) -> str:
     try:
-        dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).astimezone(ZoneInfo("Europe/Moscow"))
+        dt = datetime.fromtimestamp(ts / 1000, tz=ZoneInfo("Europe/Moscow"))
         return dt.strftime("%d.%m.%Y %H:%M")
     except Exception:
         return "неизвестно"
