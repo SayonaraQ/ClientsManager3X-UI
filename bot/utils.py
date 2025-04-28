@@ -3,6 +3,7 @@ import random
 import string
 import time
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 def generate_uuid() -> str:
     return str(uuid.uuid4())
@@ -23,9 +24,14 @@ def get_expiry_datetime(ms: int) -> datetime:
         return None
 
 def is_expiring_soon(expiry: datetime) -> bool:
-    now = datetime.now(timezone.utc).date()
-    expiry_date = expiry.astimezone(timezone.utc).date()
-    return expiry_date == now + timedelta(days=1)
+    """ Проверка: истекает сегодня или завтра """
+    now_msk = datetime.now(ZoneInfo("Europe/Moscow"))
+    expiry_msk = expiry.astimezone(ZoneInfo("Europe/Moscow"))
+
+    today = now_msk.date()
+    tomorrow = today + timedelta(days=1)
+
+    return expiry_msk.date() in (today, tomorrow)
 
 def is_admin(tg_id: int) -> bool:
     from os import getenv
@@ -33,6 +39,7 @@ def is_admin(tg_id: int) -> bool:
 
 def timestamp_to_date(ts: int) -> str:
     try:
-        return datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime("%d.%m.%Y %H:%M:%S")
+        dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).astimezone(ZoneInfo("Europe/Moscow"))
+        return dt.strftime("%d.%m.%Y %H:%M")
     except Exception:
         return "неизвестно"
