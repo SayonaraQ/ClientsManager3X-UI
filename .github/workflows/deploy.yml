@@ -1,0 +1,36 @@
+name: Deploy ClientsManager3X-UI to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: 🔥 Deploy to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ✅ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔑 Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: 🚀 Deploy to VPS
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+            set -e
+            echo "📂 Переходим в папку проекта"
+            cd /home/ClientsManager3X-UI
+
+            echo "🔄 Делаем git pull"
+            git pull
+
+            echo "🐳 Пересобираем и перезапускаем контейнеры"
+            docker compose up -d --build
+
+            echo "✅ Деплой завершён успешно!"
+          EOF
