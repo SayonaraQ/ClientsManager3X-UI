@@ -1,0 +1,11 @@
+services:
+  vpn-client-bot:
+    container_name: vpn-client-bot
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data/uploads:/app/data/uploads
