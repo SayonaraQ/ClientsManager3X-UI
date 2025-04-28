@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from datetime import datetime, timedelta
 import os
 
-from bot.api import find_user_by_tg, add_trial_user, get_inbounds, prolong_user
+from bot.api import find_user_by_tg, add_trial_user, get_inbounds, update_user_expiry
 from bot.utils import generate_uuid, generate_sub_id, generate_email, generate_expiry, get_expiry_datetime, is_admin
 
 router = Router()
@@ -182,7 +182,7 @@ async def handle_extend(callback: CallbackQuery):
     new_expiry = expiry_now + timedelta(days=30 * months)
     new_expiry = new_expiry.replace(hour=23, minute=59, second=59, microsecond=0)
 
-    success = await prolong_user(user["client"]["id"], int(new_expiry.timestamp() * 1000))
+    success = await update_user_expiry(user["client"]["id"], int(new_expiry.timestamp() * 1000))
 
     await callback.message.edit_reply_markup()  # Удаляем кнопки
 
