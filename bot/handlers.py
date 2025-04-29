@@ -155,7 +155,7 @@ async def handle_payment_choice(callback: CallbackQuery):
         text=(
             f"💸 Перейдите по ссылке для оплаты:\n{link}\n\n"
             "⚠️ <b>Важно:</b> оплата через ЮMoney доступна только авторизованным пользователям.\n"
-            "Для оплаты потребуется регистрация аккаунта. Это не займет много времени.\n"
+            "Для оплаты потребуется регистрация аккаунта в системе ЮMoney. Это не займет много времени.\n\n"
             "Альтернативные методы оплаты можно уточнить у администратора по кнопке ниже."
         ),
         reply_markup=InlineKeyboardMarkup(
@@ -224,7 +224,7 @@ async def handle_extend(callback: CallbackQuery):
     new_expiry = expiry_now + timedelta(days=30 * months)
     new_expiry = new_expiry.replace(hour=23, minute=59, second=59, microsecond=0)
 
-    success = await update_user_expiry(user["inbound_id"], user["client"]["id"], int(new_expiry.timestamp() * 1000))
+    success = await update_user_expiry(user["client"]["id"], int(new_expiry.timestamp() * 1000))
 
     await callback.answer()
 
