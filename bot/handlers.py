@@ -1,9 +1,8 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
-
 from bot.api import find_user_by_tg, add_trial_user, get_inbounds, update_user_expiry
 from bot.utils import generate_uuid, generate_sub_id, generate_email, generate_expiry, get_expiry_datetime, is_admin
 
