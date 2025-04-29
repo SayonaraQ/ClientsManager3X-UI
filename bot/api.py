@@ -136,38 +136,44 @@ async def update_user_expiry(client_id: str, new_expiry_time: int) -> bool:
     try:
         session = await get_session()
 
-        # Загружаем inbounds
         inbounds = await get_inbounds()
         if not inbounds:
             print("[api.py] ❌ Не удалось получить список inbounds")
             return False
 
-        # Ищем клиента и его inbound
+        # Ищем inbound и клиента в нем
         for inbound in inbounds:
             try:
                 settings = json.loads(inbound.get("settings", "{}"))
-                for client in settings.get("clients", []):
+                clients = settings.get("clients", [])
+                updated = False
+
+                for client in clients:
                     if client.get("id") == client_id:
                         client["expiryTime"] = new_expiry_time
+                        updated = True
+                        break
 
-                        payload = {
-                            "id": client_id,
-                            "settings": json.dumps(client)
-                        }
+                if updated:
+                    payload = {
+                        "id": inbound["id"],  # важно!
+                        "settings": json.dumps({"clients": clients})
+                    }
 
-                        async with session.post(
-                            f"{XUI_API_URL}/panel/inbound/updateClient",
-                            data=payload,
-                            cookies=cookies,
-                            headers={"Content-Type": "application/x-www-form-urlencoded"}
-                        ) as resp:
-                            text = await resp.text()
-                            if resp.status == 200:
-                                print(f"[api.py] ✅ Продление клиента {client_id} выполнено успешно.")
-                                return True
-                            else:
-                                print(f"[api.py] ❌ Ошибка продления ({resp.status}): {text}")
-                                return False
+                    async with session.post(
+                        f"{XUI_API_URL}/panel/inbound/updateClient",
+                        data=payload,
+                        cookies=cookies,
+                        headers={"Content-Type": "application/x-www-form-urlencoded"}
+                    ) as resp:
+                        text = await resp.text()
+                        if resp.status == 200:
+                            print(f"[api.py] ✅ Продление клиента {client_id} выполнено успешно.")
+                            return True
+                        else:
+                            print(f"[api.py] ❌ Ошибка продления ({resp.status}): {text}")
+                            return False
+
             except Exception as e:
                 print(f"[api.py] ⚠️ Ошибка при обработке inbound: {e}")
 
@@ -177,4 +183,3 @@ async def update_user_expiry(client_id: str, new_expiry_time: int) -> bool:
     except Exception as e:
         print(f"[api.py] ❌ Исключение в update_user_expiry: {e}")
         return False
-
