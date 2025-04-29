@@ -146,33 +146,41 @@ async def update_user_expiry(inbound_id: int, client_id: str, new_expiry_time: i
 
             try:
                 settings = json.loads(inbound.get("settings", "{}"))
-                for client in settings.get("clients", []):
+                clients = settings.get("clients", [])
+
+                updated = False
+                for client in clients:
                     if client.get("id") == client_id:
                         client["expiryTime"] = new_expiry_time
+                        updated = True
+                        break
 
-                        payload = {
-                            "id": inbound_id,
-                            "settings": json.dumps({"clients": [client]})
-                        }
+                if not updated:
+                    print(f"[api.py] ❌ Клиент с id {client_id} не найден в inbound {inbound_id}")
+                    return False
 
-                        async with session.post(
-                            f"{XUI_API_URL}/panel/inbound/updateClient"
-                            f"",
-                            data=payload,
-                            cookies=cookies,
-                            headers={"Content-Type": "application/x-www-form-urlencoded"}
-                        ) as resp:
-                            text = await resp.text()
-                            if resp.status == 200:
-                                print(f"[api.py] ✅ Подписка клиента {client_id} успешно продлена.")
-                                return True
-                            else:
-                                print(f"[api.py] ❌ Ошибка продления ({resp.status}): {text}")
-                                return False
+                payload = {
+                    "id": inbound_id,
+                    "settings": json.dumps({"clients": clients})
+                }
+
+                async with session.post(
+                    f"{XUI_API_URL}/panel/inbound/update",
+                    data=payload,
+                    cookies=cookies,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"}
+                ) as resp:
+                    text = await resp.text()
+                    if resp.status == 200 and "success" in text:
+                        print(f"[api.py] ✅ Подписка клиента {client_id} успешно продлена.")
+                        return True
+                    else:
+                        print(f"[api.py] ❌ Ошибка продления ({resp.status}): {text}")
+                        return False
+
             except Exception as e:
                 print(f"[api.py] ⚠️ Ошибка при обработке inbound: {e}")
 
-        print(f"[api.py] ❌ Клиент с id {client_id} не найден.")
         return False
 
     except Exception as e:
