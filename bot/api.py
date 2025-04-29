@@ -135,13 +135,11 @@ async def test_api_connection() -> bool:
 async def update_user_expiry(client_id: str, new_expiry_time: int) -> bool:
     try:
         session = await get_session()
-
         inbounds = await get_inbounds()
         if not inbounds:
             print("[api.py] ❌ Не удалось получить список inbounds")
             return False
 
-        # Ищем inbound и клиента в нем
         for inbound in inbounds:
             try:
                 settings = json.loads(inbound.get("settings", "{}"))
@@ -156,15 +154,15 @@ async def update_user_expiry(client_id: str, new_expiry_time: int) -> bool:
 
                 if updated:
                     payload = {
-                        "id": inbound["id"],  # важно!
+                        "id": inbound["id"],
                         "settings": json.dumps({"clients": clients})
                     }
 
                     async with session.post(
                         f"{XUI_API_URL}/panel/inbound/updateClient",
-                        data=payload,
+                        json=payload,  # <-- поменяли с data на json
                         cookies=cookies,
-                        headers={"Content-Type": "application/x-www-form-urlencoded"}
+                        headers={"Content-Type": "application/json"}  # <-- обязательно
                     ) as resp:
                         text = await resp.text()
                         if resp.status == 200:
