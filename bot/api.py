@@ -132,7 +132,7 @@ async def add_trial_user(inbound_id: int, tg_id: int):
 async def test_api_connection() -> bool:
     return await login() and (await get_inbounds() is not None)
 
-async def update_user_expiry(client_id: str, new_expiry_time: int) -> bool:
+async def update_user_expiry(inbound_id: int, client_id: str, new_expiry_time: int) -> bool:
     try:
         session = await get_session()
         inbounds = await get_inbounds()
@@ -141,12 +141,14 @@ async def update_user_expiry(client_id: str, new_expiry_time: int) -> bool:
             return False
 
         for inbound in inbounds:
+            if inbound["id"] != inbound_id:
+                continue
+
             settings = json.loads(inbound.get("settings", "{}"))
             clients = settings.get("clients", [])
 
             for client in clients:
                 if client.get("id") == client_id:
-                    # Обновляем только expiryTime
                     client["expiryTime"] = new_expiry_time
 
                     async with session.post(
@@ -156,7 +158,7 @@ async def update_user_expiry(client_id: str, new_expiry_time: int) -> bool:
                         headers={"Content-Type": "application/json"}
                     ) as resp:
                         text = await resp.text()
-                        if resp.status == 200 and "success" in text:
+                        if resp.status == 200:
                             print(f"[api.py] ✅ Подписка клиента {client_id} успешно продлена.")
                             return True
                         else:
