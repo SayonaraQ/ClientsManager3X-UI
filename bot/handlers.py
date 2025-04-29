@@ -224,7 +224,11 @@ async def handle_extend(callback: CallbackQuery):
     new_expiry = expiry_now + timedelta(days=30 * months)
     new_expiry = new_expiry.replace(hour=23, minute=59, second=59, microsecond=0)
 
-    success = await update_user_expiry(inbound_id, updated_client)
+    success = await update_user_expiry(
+        user["inbound_id"],
+        user["client"]["id"],
+        int(new_expiry.timestamp() * 1000)
+    )
 
     await callback.answer()
 
