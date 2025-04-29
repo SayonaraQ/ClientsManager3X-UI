@@ -9,7 +9,7 @@ from bot.utils import generate_uuid, generate_sub_id, generate_email, generate_e
 
 router = Router()
 
-ADMIN_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_ID", "").split(",") if x.strip()]
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 SUB_LINK_TEMPLATE = os.getenv("SUB_LINK_TEMPLATE")
 
@@ -128,11 +128,9 @@ async def handle_check_status(callback: CallbackQuery):
 async def send_payment_options(tg_id: int, bot):
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(text="1 месяц (200₽)", callback_data="pay_1"),
-                InlineKeyboardButton(text="3 месяца (600₽)", callback_data="pay_3"),
-                InlineKeyboardButton(text="6 месяцев (1800₽)", callback_data="pay_6"),
-            ]
+            [InlineKeyboardButton(text="1 месяц (200₽)", callback_data="pay_1")],
+            [InlineKeyboardButton(text="3 месяца (600₽)", callback_data="pay_3")],
+            [InlineKeyboardButton(text="6 месяцев (1800₽)", callback_data="pay_6")],
         ]
     )
     await bot.send_message(
@@ -154,11 +152,16 @@ async def handle_payment_choice(callback: CallbackQuery):
     await callback.answer()
 
     await callback.message.answer(
-        text=f"💸 Перейдите по ссылке для оплаты:\n{link}\n\n"
-             "После оплаты нажмите кнопку <b>✅ Подтвердить оплату</b>.",
+        text=(
+            f"💸 Перейдите по ссылке для оплаты:\n{link}\n\n"
+            "⚠️ <b>Важно:</b> оплата через ЮMoney доступна только авторизованным пользователям.\n"
+            "Для оплаты потребуется регистрация аккаунта. Это не займет много времени.\n"
+            "Альтернативные методы оплаты можно уточнить у администратора по кнопке ниже."
+        ),
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="✅ Подтвердить оплату", callback_data="payment_done")]
+                [InlineKeyboardButton(text="✅ Подтвердить оплату", callback_data="payment_done")],
+                [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
             ]
         ),
         disable_web_page_preview=True
@@ -178,26 +181,25 @@ async def handle_payment_done(callback: CallbackQuery):
 
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(text="Продлить на 1 месяц", callback_data=f"extend_1_{tg_id}"),
-                InlineKeyboardButton(text="Продлить на 3 месяца", callback_data=f"extend_3_{tg_id}"),
-                InlineKeyboardButton(text="Продлить на 6 месяцев", callback_data=f"extend_6_{tg_id}"),
-            ]
+            [InlineKeyboardButton(text="Продлить на 1 месяц", callback_data=f"extend_1_{tg_id}")],
+            [InlineKeyboardButton(text="Продлить на 3 месяца", callback_data=f"extend_3_{tg_id}")],
+            [InlineKeyboardButton(text="Продлить на 6 месяцев", callback_data=f"extend_6_{tg_id}")],
         ]
     )
 
     await callback.answer()
     await callback.message.answer("✅ Спасибо! Ваше подтверждение отправлено администратору.")
 
-    await callback.bot.send_message(
-        chat_id=ADMIN_CHAT_ID,
-        text=(
-            f"👤 Пользователь @{username} подтвердил оплату.\n"
-            f"Telegram ID: <code>{tg_id}</code>\n\n"
-            "Выберите срок продления:"
-        ),
-        reply_markup=kb
-    )
+    for admin_id in ADMIN_IDS:
+        await callback.bot.send_message(
+            chat_id=admin_id,
+            text=(
+                f"👤 Пользователь @{username} подтвердил оплату.\n"
+                f"Telegram ID: <code>{tg_id}</code>\n\n"
+                "Выберите срок продления:"
+            ),
+            reply_markup=kb
+        )
 
 # Обработка продления админом
 @router.callback_query(F.data.startswith("extend_"))

@@ -36,7 +36,7 @@ async def notify_users(bot: Bot):
                     inline_keyboard=[
                         [InlineKeyboardButton(text="🔁 Продлить подписку", callback_data="renew_subscription")],
                         [InlineKeyboardButton(
-                            text="💬 Написать админу",
+                            text="💬 Связаться с админом",
                             url=f"tg://resolve?domain={ADMIN_USERNAME}&text={ADMIN_GREETING_TEXT.replace(' ', '%20')}"
                         )]
                     ]
