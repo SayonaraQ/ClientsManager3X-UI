@@ -150,7 +150,7 @@ async def update_user_expiry(client_id: str, new_expiry_time: int) -> bool:
                     client["expiryTime"] = new_expiry_time
 
                     async with session.post(
-                        f"{XUI_API_URL}/panel/api/inbounds/updateClient/{client_id}",
+                        f"{XUI_API_URL}/panel/inbounds/updateClient/{client_id}",
                         json=client,
                         cookies=cookies,
                         headers={"Content-Type": "application/json"}
