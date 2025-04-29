@@ -25,6 +25,14 @@ async def start_handler(message: Message):
     tg_id = message.from_user.id
     user = await find_user_by_tg(tg_id)
 
+    # Общие кнопки для всех пользователей
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🔎 Проверить статус", callback_data="check_status")],
+            [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
+        ]
+    )
+
     if user:
         expiry_ms = user.get("expiryTime")
         expiry_str = "∞"
@@ -32,21 +40,24 @@ async def start_handler(message: Message):
             dt = get_expiry_datetime(expiry_ms)
             if dt:
                 expiry_str = dt.strftime("%d.%m.%Y %H:%M")
+
         await message.answer(
-            "👋 Добро пожаловать! Ваша подписка активна.\n"
-            f"📅 Дата окончания: <b>{expiry_str}</b>\n"
-            "Я напомню вам о необходимости продления за день до окончания подписки."
+            "👋 Добро пожаловать!\n"
+            f"📅 Ваша подписка активна до: <b>{expiry_str}</b>\n\n"
+            "⏰ Я напомню о необходимости продления за день до окончания срока подписки.",
+            reply_markup=kb
         )
     else:
-        kb = InlineKeyboardMarkup(
+        trial_kb = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="Получить доступ", callback_data="get_trial")]
+                [InlineKeyboardButton(text="Получить доступ", callback_data="get_trial")],
+                [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
             ]
         )
         await message.answer(
             "👋 Привет! Похоже, у вас ещё нет подписки на наш VPN.\n"
             "Хотите получить бесплатный пробный доступ на 3 дня?",
-            reply_markup=kb
+            reply_markup=trial_kb
         )
 
 # Кнопка получения триала
@@ -105,7 +116,7 @@ async def handle_check_status(callback: CallbackQuery):
         await callback.message.answer(
             "🔎 Статус подписки: <b>Активна</b>\n"
             f"📅 Дата окончания: <b>{expiry_str}</b>\n\n"
-            "❗ Я напомню вам о необходимости продления за день до окончания подписки."
+            "❗ Я напомню о необходимости продления за день до окончания подписки."
         )
     else:
         await callback.message.answer(
