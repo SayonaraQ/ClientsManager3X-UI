@@ -79,7 +79,7 @@ async def handle_get_trial(callback: CallbackQuery):
     expiry = get_expiry_datetime(expiry_ms).strftime("%d.%m.%Y %H:%M")
     sub_link = SUB_LINK_TEMPLATE.format(subId=sub_id)
 
-    await callback.answer()  # Обязательно ответ на колбэк!
+    await callback.answer()
 
     await callback.message.answer(
         f"🎉 Ваша пробная подписка активирована!\n\n"
@@ -160,8 +160,15 @@ async def handle_payment_choice(callback: CallbackQuery):
             inline_keyboard=[
                 [InlineKeyboardButton(text="✅ Подтвердить оплату", callback_data="payment_done")]
             ]
-        )
+        ),
+        disable_web_page_preview=True
     )
+
+# Обработка кнопки "🔁 Продлить подписку"
+@router.callback_query(F.data == "renew_subscription")
+async def handle_renew_subscription(callback: CallbackQuery):
+    await callback.answer()
+    await send_payment_options(callback.from_user.id, callback.bot)
 
 # Обработка "✅ Подтвердить оплату"
 @router.callback_query(F.data == "payment_done")
