@@ -151,14 +151,19 @@ async def update_user_expiry(inbound_id: int, client_id: str, new_expiry_time: i
                 if client.get("id") == client_id:
                     client["expiryTime"] = new_expiry_time
 
+                    payload = {
+                        "id": str(inbound_id),
+                        "settings": json.dumps({"clients": [client]})
+                    }
+
                     async with session.post(
-                        f"{XUI_API_URL}/panel/inbounds/updateClient/{client_id}",
-                        json=client,
+                        f"{XUI_API_URL}/panel/inbound/updateClient/{client_id}",
+                        data=payload,
                         cookies=cookies,
-                        headers={"Content-Type": "application/json"}
+                        headers={"Content-Type": "application/x-www-form-urlencoded"}
                     ) as resp:
                         text = await resp.text()
-                        if resp.status == 200:
+                        if resp.status == 200 and "success" in text:
                             print(f"[api.py] ✅ Подписка клиента {client_id} успешно продлена.")
                             return True
                         else:
@@ -171,3 +176,4 @@ async def update_user_expiry(inbound_id: int, client_id: str, new_expiry_time: i
     except Exception as e:
         print(f"[api.py] ❌ Исключение в update_user_expiry: {e}")
         return False
+
