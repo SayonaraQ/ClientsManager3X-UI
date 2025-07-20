@@ -1,9 +1,9 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject
 from datetime import datetime, timedelta, timezone
 import os
-from bot.api import find_user_by_tg, add_trial_user, get_inbounds, update_user_expiry
+from bot.api import find_user_by_tg, add_trial_user, get_inbounds, update_user_expiry, get_all_clients
 from bot.utils import generate_uuid, generate_sub_id, generate_email, generate_expiry, get_expiry_datetime, is_admin
 
 router = Router()
@@ -239,3 +239,30 @@ async def handle_extend(callback: CallbackQuery):
         await callback.message.answer(
             f"❌ Ошибка при продлении пользователя <code>{tg_id}</code>."
         )
+
+# Рассылка сообщений пользователям
+@router.message(Command("broadcast"))
+async def handle_broadcast(message: Message, command: CommandObject):
+    if not is_admin(message.from_user.id):
+        await message.answer("⛔ У вас нет прав.")
+        return
+
+    text = command.args
+    if not text:
+        await message.answer("❗ Используйте: /broadcast [сообщение]", parse_mode="HTML")
+        return
+
+    # Получаем всех пользователей
+    clients = await get_all_clients()
+    count = 0
+    for client in clients:
+        tg_id = client.get("tgId")
+        if not tg_id:
+            continue
+        try:
+            await message.bot.send_message(tg_id, text)
+            count += 1
+        except Exception as e:
+            print(f"[broadcast] ❌ Не удалось отправить {tg_id}: {e}")
+
+    await message.answer(f"✅ Сообщение отправлено {count} пользователям.")
