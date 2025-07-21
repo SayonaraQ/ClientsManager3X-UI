@@ -2,6 +2,7 @@ from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command, CommandObject
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from bot.sync import sync_to_google_sheets
 import os
 from bot.api import find_user_by_tg, add_trial_user, get_inbounds, update_user_expiry, get_all_clients
@@ -103,6 +104,12 @@ async def handle_get_trial(callback: CallbackQuery):
     )
 
 # Проверить статус подписки
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from aiogram.types import CallbackQuery
+from bot.utils import get_expiry_datetime
+from bot.handlers import send_payment_options  # убедитесь, что send_payment_options импортируется
+
 @router.callback_query(F.data == "check_status")
 async def handle_check_status(callback: CallbackQuery):
     tg_id = callback.from_user.id
@@ -113,15 +120,31 @@ async def handle_check_status(callback: CallbackQuery):
     if user:
         expiry_ms = user.get("expiryTime")
         expiry_str = "∞"
+        expired = False
+
         if expiry_ms:
             dt = get_expiry_datetime(expiry_ms)
             if dt:
                 expiry_str = dt.strftime("%d.%m.%Y %H:%M")
-        await callback.message.answer(
-            "🔎 Статус подписки: <b>Активна</b>\n"
-            f"📅 Дата окончания: <b>{expiry_str}</b>\n\n"
-            "❗ Я напомню о необходимости продления за день до окончания подписки."
-        )
+                now = datetime.now(ZoneInfo("Europe/Moscow"))
+                if dt < now:
+                    expired = True
+
+        if expired:
+            # подписка просрочена
+            await callback.message.answer(
+                "❌ Статус подписки: <b>Истекла</b>\n"
+                f"📅 Дата окончания: <b>{expiry_str}</b>\n\n"
+                "Чтобы продлить подписку, выберите один из вариантов ниже."
+            )
+            await send_payment_options(tg_id, callback.bot)
+        else:
+            # всё ещё активна
+            await callback.message.answer(
+                "🔎 Статус подписки: <b>Активна</b>\n"
+                f"📅 Дата окончания: <b>{expiry_str}</b>\n\n"
+                "❗ Я напомню о необходимости продления за день до окончания подписки."
+            )
     else:
         await callback.message.answer(
             "❌ У вас нет активной подписки.\n"
@@ -171,13 +194,13 @@ async def handle_payment_choice(callback: CallbackQuery):
         disable_web_page_preview=True
     )
 
-# Обработка кнопки "🔁 Продлить подписку"
+# Обработка кнопки "Продлить подписку"
 @router.callback_query(F.data == "renew_subscription")
 async def handle_renew_subscription(callback: CallbackQuery):
     await callback.answer()
     await send_payment_options(callback.from_user.id, callback.bot)
 
-# Обработка "✅ Подтвердить оплату"
+# Обработка "Подтвердить оплату"
 @router.callback_query(F.data == "payment_done")
 async def handle_payment_done(callback: CallbackQuery):
     tg_id = callback.from_user.id
