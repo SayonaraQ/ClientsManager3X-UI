@@ -2,6 +2,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command, CommandObject
 from datetime import datetime, timedelta, timezone
+from bot.sync import sync_to_google_sheets
 import os
 from bot.api import find_user_by_tg, add_trial_user, get_inbounds, update_user_expiry, get_all_clients
 from bot.utils import generate_uuid, generate_sub_id, generate_email, generate_expiry, get_expiry_datetime, is_admin
@@ -270,3 +271,9 @@ async def handle_broadcast(message: Message, command: CommandObject):
             print(f"[broadcast] ❌ Не удалось отправить {tg_id}: {e}")
 
     await message.answer(f"✅ Сообщение отправлено {count} пользователям.")
+
+#google sheets
+@router.message(Command("sync"))
+async def sync_command(message: Message, bot: Bot):
+    await sync_to_google_sheets(bot)
+    await message.answer("✅ Синхронизация таблицы завершена.")
