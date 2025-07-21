@@ -2,17 +2,16 @@ import asyncio
 import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
 from dotenv import load_dotenv
-
 from bot.handlers import router
 from bot.notifier import notify_users
 from bot.api import test_api_connection
+from bot.sync import sync_to_google_sheets
 
 # Загрузка переменных из .env
 load_dotenv()
@@ -73,12 +72,32 @@ async def periodic_notifications(bot: Bot):
         print("🔔 Запуск уведомлений...")
         await notify_users(bot)
 
+# Фоновая задача — синхронизация таблицы в 09:00 МСК
+async def sync_scheduler(bot: Bot):
+    while True:
+        now = datetime.now(ZoneInfo("Europe/Moscow"))
+        target = now.replace(hour=9, minute=0, second=0, microsecond=0)
+        if now > target:
+            target += timedelta(days=1)
+
+        wait_seconds = (target - now).total_seconds()
+        print(f"🕘 Ждём до 09:00 МСК для синхронизации: {wait_seconds / 3600:.2f} ч.")
+        await asyncio.sleep(wait_seconds)
+
+        print("🔁 Запуск синхронизации таблицы...")
+        try:
+            await sync_to_google_sheets(bot)
+        except Exception as e:
+            print(f"[SYNC] ❌ Ошибка синхронизации: {e}")
+
+
 # Точка входа
 async def main():
     print("✅ Бот запускается...")
     await log_api_info()
     await set_commands()
     asyncio.create_task(periodic_notifications(bot))
+    asyncio.create_task(sync_scheduler(bot))
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
