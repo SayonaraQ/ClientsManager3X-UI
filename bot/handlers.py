@@ -59,7 +59,7 @@ async def start_handler(message: Message):
             ]
         )
         await message.answer(
-            "👋 Привет! Похоже, у вас ещё нет подписки на наш VPN.\n"
+            "👋 Привет! Похоже, у вас ещё нет подписки на наш сервис.\n"
             "Хотите получить бесплатный пробный доступ на 3 дня?",
             reply_markup=trial_kb
         )
@@ -70,7 +70,7 @@ async def handle_get_trial(callback: CallbackQuery):
     tg_id = callback.from_user.id
     inbounds = await get_inbounds()
     if not inbounds:
-        await callback.answer("❌ Не удалось получить информацию о VPN. Попробуйте позже.", show_alert=True)
+        await callback.answer("❌ Не удалось получить информацию. Попробуйте позже.", show_alert=True)
         return
 
     inbound = inbounds[0]
@@ -92,7 +92,7 @@ async def handle_get_trial(callback: CallbackQuery):
         f"✅ Используйте её в вашем VPN-клиенте.\n"
         f"Инструкция по подключению: https://telegra.ph/Instrukciya-po-nastrojke-nashego-VPN-09-11-2\n\n"
         f"Стоимость подписки после пробного периода — 200р/месяц\n\n"
-        f"Если возникнут вопросы — пишите <a href='https://t.me/{ADMIN_USERNAME}'>админу</a>.",
+        f"По любым вопросам можно обращаться к <a href='https://t.me/{ADMIN_USERNAME}'>админу</a>.",
         disable_web_page_preview=True,
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
