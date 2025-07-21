@@ -104,12 +104,6 @@ async def handle_get_trial(callback: CallbackQuery):
     )
 
 # Проверить статус подписки
-from datetime import datetime
-from zoneinfo import ZoneInfo
-from aiogram.types import CallbackQuery
-from bot.utils import get_expiry_datetime
-from bot.handlers import send_payment_options  # убедитесь, что send_payment_options импортируется
-
 @router.callback_query(F.data == "check_status")
 async def handle_check_status(callback: CallbackQuery):
     tg_id = callback.from_user.id
