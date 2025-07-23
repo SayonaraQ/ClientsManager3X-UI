@@ -21,32 +21,44 @@ async def start_handler(message: Message):
     tg_id = message.from_user.id
     user = await find_user_by_tg(tg_id)
 
-    # Общие кнопки для всех пользователей
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🔎 Проверить статус", callback_data="check_status")],
-            [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
-        ]
-    )
+    now = datetime.now(ZoneInfo("Europe/Moscow"))
+    reply_buttons = [
+        [InlineKeyboardButton(text="🔎 Проверить статус", callback_data="check_status")],
+        [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
+    ]
 
     if user:
         expiry_ms = user.get("expiryTime")
         expiry_str = "∞"
+        expired = False
+
         if expiry_ms:
             dt = get_expiry_datetime(expiry_ms)
             if dt:
                 expiry_str = dt.strftime("%d.%m.%Y %H:%M")
+                expired = dt < now
 
         sub_id = user.get("subId")
         sub_link = SUB_LINK_TEMPLATE.format(subId=sub_id) if sub_id else "Не найдена"
 
-        await message.answer(
-            "👋 Добро пожаловать!\n"
-            f"📅 Ваша подписка активна до: <b>{expiry_str}</b>\n"
-            f"🔗 Ваша ссылка для подключения:\n<code>{sub_link}</code>\n\n"
-            "⏰ Я напомню о необходимости продления за день до окончания срока действия подписки.",
-            reply_markup=kb
-        )
+        if expired:
+            reply_buttons.insert(0, [InlineKeyboardButton(text="🔁 Продлить подписку", callback_data="renew_subscription")])
+            await message.answer(
+                "👋 Добро пожаловать!\n"
+                f"❌ Ваша подписка истекла <b>{expiry_str}</b>\n\n"
+                f"🔗 Ваша ссылка на подключение:\n<code>{sub_link}</code>\n\n"
+                "💳 Чтобы снова получить доступ, выберите срок продления подписки:",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=reply_buttons)
+            )
+        else:
+            await message.answer(
+                "👋 Добро пожаловать!\n"
+                f"📅 Ваша подписка активна до: <b>{expiry_str}</b>\n"
+                f"🔗 Ваша ссылка для подключения:\n<code>{sub_link}</code>\n\n"
+                "⏰ Я напомню о необходимости продления за день до окончания срока действия подписки.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=reply_buttons)
+            )
+
     else:
         trial_kb = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -59,6 +71,7 @@ async def start_handler(message: Message):
             "Хотите получить бесплатный пробный доступ на 3 дня?",
             reply_markup=trial_kb
         )
+
 
 # Кнопка получения триала
 @router.callback_query(F.data == "get_trial")
@@ -116,29 +129,43 @@ async def handle_check_status(callback: CallbackQuery):
             if dt:
                 expiry_str = dt.strftime("%d.%m.%Y %H:%M")
                 now = datetime.now(ZoneInfo("Europe/Moscow"))
-                if dt < now:
-                    expired = True
+                expired = dt < now
 
         if expired:
-            # подписка просрочена
             await callback.message.answer(
                 "❌ Статус подписки: <b>Истекла</b>\n"
                 f"📅 Дата окончания: <b>{expiry_str}</b>\n\n"
-                "Чтобы продлить подписку, выберите один из вариантов ниже."
+                "Чтобы продлить подписку, выберите один из вариантов ниже.",
+                reply_markup=InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [InlineKeyboardButton(text="🔁 Продлить подписку", callback_data="renew_subscription")],
+                        [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
+                    ]
+                )
             )
-            await send_payment_options(tg_id, callback.bot)
         else:
-            # всё ещё активна
             await callback.message.answer(
                 "🔎 Статус подписки: <b>Активна</b>\n"
                 f"📅 Дата окончания: <b>{expiry_str}</b>\n\n"
-                "❗ Я напомню о необходимости продления за день до окончания подписки."
+                "❗ Я напомню о необходимости продления за день до окончания подписки.",
+                reply_markup=InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [InlineKeyboardButton(text="🔁 Продлить подписку", callback_data="renew_subscription")],
+                        [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
+                    ]
+                )
             )
     else:
         await callback.message.answer(
             "❌ У вас нет активной подписки.\n"
-            "Чтобы получить доступ, нажмите команду /start."
+            "Чтобы получить доступ, нажмите команду /start.",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
+                ]
+            )
         )
+
 
 # Новые кнопки оплаты
 @router.callback_query(F.data == "renew_subscription")
