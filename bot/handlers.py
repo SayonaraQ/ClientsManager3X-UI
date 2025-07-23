@@ -236,8 +236,9 @@ async def successful_payment_handler(message: Message):
         return
 
     expiry_now = get_expiry_datetime(user["expiryTime"])
-    if not expiry_now:
-        expiry_now = datetime.now()
+    now = datetime.now(ZoneInfo("Europe/Moscow"))
+    if not expiry_now or expiry_now < now:
+        expiry_now = now
 
     new_expiry = expiry_now + timedelta(days=30 * months)
     new_expiry = new_expiry.replace(hour=23, minute=59, second=59, microsecond=0)
