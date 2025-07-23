@@ -1,5 +1,6 @@
 from aiogram import Router, F, Bot
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, PreCheckoutQuery
+from aiogram.enums import ContentType
 from aiogram.filters import Command, CommandObject
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -13,12 +14,6 @@ router = Router()
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_ID", "").split(",") if x.strip()]
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 SUB_LINK_TEMPLATE = os.getenv("SUB_LINK_TEMPLATE")
-
-YOOMONEY_LINKS = {
-    "1": os.getenv("YOOMONEY_LINK_1"),
-    "3": os.getenv("YOOMONEY_LINK_3"),
-    "6": os.getenv("YOOMONEY_LINK_6")
-}
 
 # /start команда
 @router.message(Command("start"))
@@ -145,97 +140,70 @@ async def handle_check_status(callback: CallbackQuery):
             "Чтобы получить доступ, нажмите команду /start."
         )
 
-# Кнопка "Продлить подписку"
-async def send_payment_options(tg_id: int, bot):
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="1 месяц (200₽)", callback_data="pay_1")],
-            [InlineKeyboardButton(text="3 месяца (600₽)", callback_data="pay_3")],
-            [InlineKeyboardButton(text="6 месяцев (1800₽)", callback_data="pay_6")],
-        ]
-    )
-    await bot.send_message(
-        chat_id=tg_id,
-        text="💳 Выберите срок продления подписки:",
-        reply_markup=kb
-    )
-
-# Обработка выбора срока оплаты
-@router.callback_query(F.data.startswith("pay_"))
-async def handle_payment_choice(callback: CallbackQuery):
-    choice = callback.data.split("_")[1]
-
-    link = YOOMONEY_LINKS.get(choice)
-    if not link:
-        await callback.answer("❌ Ошибка, неверный вариант оплаты.", show_alert=True)
-        return
-
-    await callback.answer()
-
-    await callback.message.answer(
-        text=(
-            f"💸 Перейдите по ссылке для оплаты:\n{link}\n\n"
-            "⚠️ <b>Важно:</b> оплата через ЮMoney доступна только авторизованным пользователям.\n"
-            "Для оплаты потребуется регистрация аккаунта в системе ЮMoney. Это не займет много времени.\n\n"
-            "Альтернативные методы оплаты можно уточнить у администратора по кнопке ниже."
-        ),
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="✅ Подтвердить оплату", callback_data="payment_done")],
-                [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
-            ]
-        ),
-        disable_web_page_preview=True
-    )
-
-# Обработка кнопки "Продлить подписку"
+# Новые кнопки оплаты
 @router.callback_query(F.data == "renew_subscription")
 async def handle_renew_subscription(callback: CallbackQuery):
     await callback.answer()
-    await send_payment_options(callback.from_user.id, callback.bot)
-
-# Обработка "Подтвердить оплату"
-@router.callback_query(F.data == "payment_done")
-async def handle_payment_done(callback: CallbackQuery):
-    tg_id = callback.from_user.id
-    username = callback.from_user.username or "Без username"
-
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Продлить на 1 месяц", callback_data=f"extend_1_{tg_id}")],
-            [InlineKeyboardButton(text="Продлить на 3 месяца", callback_data=f"extend_3_{tg_id}")],
-            [InlineKeyboardButton(text="Продлить на 6 месяцев", callback_data=f"extend_6_{tg_id}")],
+            [InlineKeyboardButton(text="1 месяц (200₽)", callback_data="buy_1m")],
+            [InlineKeyboardButton(text="3 месяца (600₽)", callback_data="buy_3m")],
+            [InlineKeyboardButton(text="6 месяцев (1800₽)", callback_data="buy_6m")],
         ]
     )
+    await callback.message.answer("💳 Выберите срок продления подписки:", reply_markup=kb)
 
-    await callback.answer()
-    await callback.message.answer("✅ Спасибо! Ваше подтверждение отправлено администратору.")
-
-    for admin_id in ADMIN_IDS:
-        await callback.bot.send_message(
-            chat_id=admin_id,
-            text=(
-                f"👤 Пользователь @{username} подтвердил оплату.\n"
-                f"Telegram ID: <code>{tg_id}</code>\n\n"
-                "Выберите срок продления:"
-            ),
-            reply_markup=kb
-        )
-
-# Обработка продления админом
-@router.callback_query(F.data.startswith("extend_"))
-async def handle_extend(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer("⛔ У вас нет прав.", show_alert=True)
+@router.callback_query(F.data.startswith("buy_"))
+async def handle_buy_subscription(callback: CallbackQuery):
+    plan = callback.data.split("_")[1]
+    prices = {
+        "1m": {"amount": 20000, "label": "1 месяц", "months": 1},
+        "3m": {"amount": 60000, "label": "3 месяца", "months": 3},
+        "6m": {"amount": 180000, "label": "6 месяцев", "months": 6}
+    }
+    if plan not in prices:
+        await callback.answer("❌ Неверный план", show_alert=True)
         return
 
-    parts = callback.data.split("_")
-    months = int(parts[1])
-    tg_id = int(parts[2])
+    await callback.answer()
+
+    price = prices[plan]
+    provider_token = os.getenv("PAYMENT_PROVIDER_TOKEN")
+    await callback.bot.send_invoice(
+        chat_id=callback.from_user.id,
+        title="Продление подписки",
+        description=f"Подписка на {price['label']}",
+        provider_token=provider_token,
+        currency="RUB",
+        prices=[LabeledPrice(label=price["label"], amount=price["amount"])],
+        payload=f"{callback.from_user.id}_{plan}"
+    )
+
+# Обязательный pre-checkout
+@router.pre_checkout_query(lambda q: True)
+async def pre_checkout(pre_checkout_q: PreCheckoutQuery):
+    await pre_checkout_q.answer(ok=True)
+
+# Успешная оплата
+@router.message(F.content_type == ContentType.SUCCESSFUL_PAYMENT)
+async def successful_payment_handler(message: Message):
+    payload = message.successful_payment.invoice_payload
+    try:
+        tg_id_str, plan = payload.split("_")
+        tg_id = int(tg_id_str)
+    except Exception:
+        await message.answer("⚠️ Не удалось обработать оплату.")
+        return
+
+    months_map = {"1m": 1, "3m": 3, "6m": 6}
+    months = months_map.get(plan)
+    if not months:
+        await message.answer("⚠️ Неизвестный тариф.")
+        return
 
     user = await find_user_by_tg(tg_id)
     if not user:
-        await callback.answer("❌ Пользователь не найден.", show_alert=True)
+        await message.answer("⚠️ Пользователь не найден.")
         return
 
     expiry_now = get_expiry_datetime(user["expiryTime"])
@@ -251,16 +219,10 @@ async def handle_extend(callback: CallbackQuery):
         int(new_expiry.astimezone(timezone.utc).timestamp() * 1000)
     )
 
-    await callback.answer()
-
     if success:
-        await callback.message.answer(
-            f"✅ Подписка пользователя <code>{tg_id}</code> продлена до {new_expiry.strftime('%d.%m.%Y %H:%M:%S')}."
-        )
+        await message.answer(f"✅ Подписка продлена до <b>{new_expiry.strftime('%d.%m.%Y %H:%M')}</b>")
     else:
-        await callback.message.answer(
-            f"❌ Ошибка при продлении пользователя <code>{tg_id}</code>."
-        )
+        await message.answer("❌ Не удалось продлить подписку. Обратитесь к администратору.")
 
 # Рассылка сообщений пользователям
 @router.message(Command("broadcast"))
