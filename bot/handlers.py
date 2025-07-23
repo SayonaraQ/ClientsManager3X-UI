@@ -1,5 +1,5 @@
 from aiogram import Router, F, Bot
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, PreCheckoutQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, PreCheckoutQuery, ShippingOption, ContentType
 from aiogram.enums import ContentType
 from aiogram.filters import Command, CommandObject
 from datetime import datetime, timedelta, timezone
@@ -188,6 +188,7 @@ async def handle_buy_subscription(callback: CallbackQuery):
         "3m": {"amount": 60000, "label": "3 месяца", "months": 3},
         "6m": {"amount": 180000, "label": "6 месяцев", "months": 6}
     }
+
     if plan not in prices:
         await callback.answer("❌ Неверный план", show_alert=True)
         return
@@ -196,13 +197,14 @@ async def handle_buy_subscription(callback: CallbackQuery):
 
     price = prices[plan]
     provider_token = os.getenv("PAYMENT_PROVIDER_TOKEN")
-    await callback.bot.send_invoice(
-        chat_id=callback.from_user.id,
+
+    await callback.message.answer_invoice(
         title="Продление подписки",
         description=f"Подписка на {price['label']}",
         provider_token=provider_token,
         currency="RUB",
         prices=[LabeledPrice(label=price["label"], amount=price["amount"])],
+        start_parameter="renew_sub",
         payload=f"{callback.from_user.id}_{plan}"
     )
 
