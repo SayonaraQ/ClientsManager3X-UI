@@ -175,7 +175,7 @@ async def handle_renew_subscription(callback: CallbackQuery):
         inline_keyboard=[
             [InlineKeyboardButton(text="1 месяц (200₽)", callback_data="buy_1m")],
             [InlineKeyboardButton(text="3 месяца (600₽)", callback_data="buy_3m")],
-            [InlineKeyboardButton(text="6 месяцев (1800₽)", callback_data="buy_6m")],
+            [InlineKeyboardButton(text="6 месяцев (1200₽)", callback_data="buy_6m")],
         ]
     )
     await callback.message.answer("💳 Выберите срок продления подписки:", reply_markup=kb)
@@ -186,7 +186,7 @@ async def handle_buy_subscription(callback: CallbackQuery):
     prices = {
         "1m": {"amount": 20000, "label": "1 месяц", "months": 1},
         "3m": {"amount": 60000, "label": "3 месяца", "months": 3},
-        "6m": {"amount": 180000, "label": "6 месяцев", "months": 6}
+        "6m": {"amount": 120000, "label": "6 месяцев", "months": 6}
     }
 
     if plan not in prices:
