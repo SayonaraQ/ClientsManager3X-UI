@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from .api import get_all_clients
 from gspread_formatting import Color
+from referrals import export_to_gsheet
 
 # Загрузка .env
 load_dotenv()
@@ -155,3 +156,9 @@ async def sync_to_google_sheets(bot: Bot):
 
     except Exception as e:
         print(f"[sync] \u26a0\ufe0f Ошибка при применении подсветки: {e}")
+
+    try:
+        await export_to_gsheet()
+    except Exception as e:
+        print(f"[sync] ⚠️ Ошибка при синхронизации реферальной таблицы: {e}")
+

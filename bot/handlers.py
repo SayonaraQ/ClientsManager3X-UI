@@ -10,6 +10,7 @@ from aiogram.filters import Command, CommandObject, CommandStart
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from dateutil.relativedelta import relativedelta
+from bot.referrals import export_to_gsheet
 from bot.sync import sync_to_google_sheets
 from bot import referrals
 from bot.api import find_user_by_tg, add_trial_user, get_inbounds, update_user_expiry, get_all_clients
@@ -25,8 +26,6 @@ SUB_LINK_TEMPLATE = os.getenv("SUB_LINK_TEMPLATE")
 Configuration.account_id = os.getenv("YOOKASSA_SHOP_ID")
 Configuration.secret_key = os.getenv("YOOKASSA_SECRET_KEY")
 
-from aiogram.filters import CommandStart
-
 @router.message(CommandStart())
 async def start_handler(message: Message, command: CommandObject):
     tg_id = message.from_user.id
@@ -35,16 +34,7 @@ async def start_handler(message: Message, command: CommandObject):
 
     if not user and command.args and command.args.startswith("ref_"):
         ref_code = command.args.replace("ref_", "")
-        gc = referrals.gspread.service_account(filename=os.getenv("GOOGLE_CREDENTIALS_PATH"))
-        sh = gc.open(referrals.SPREADSHEET_NAME)
-        ws = sh.worksheet(referrals.SHEET_TAB)
-
-        rows = ws.get_all_values()
-        inviter_tg_id = None
-        for row in rows:
-            if row[2] == ref_code:
-                inviter_tg_id = int(row[0])
-                break
+        inviter_tg_id = referrals.get_inviter_by_code(ref_code)
 
         if inviter_tg_id and inviter_tg_id != tg_id:
             referrals.save_referral(inviter_tg_id, tg_id, ref_code)
@@ -465,6 +455,7 @@ async def handle_broadcast(message: Message, command: CommandObject):
 @router.message(Command("sync"))
 async def sync_command(message: Message, bot: Bot):
     await sync_to_google_sheets(bot)
+    export_to_gsheet()
     await message.answer("✅ Синхронизация таблицы завершена.")
 
 #refferal-system
