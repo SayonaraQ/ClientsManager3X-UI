@@ -25,7 +25,9 @@ SUB_LINK_TEMPLATE = os.getenv("SUB_LINK_TEMPLATE")
 Configuration.account_id = os.getenv("YOOKASSA_SHOP_ID")
 Configuration.secret_key = os.getenv("YOOKASSA_SECRET_KEY")
 
-@router.message(CommandStart(deep_link=True))
+from aiogram.filters import CommandStart
+
+@router.message(CommandStart())
 async def start_handler(message: Message, command: CommandObject):
     tg_id = message.from_user.id
     user = await find_user_by_tg(tg_id)
@@ -74,7 +76,8 @@ async def start_handler(message: Message, command: CommandObject):
                 f"❌ Ваша подписка истекла <b>{expiry_str}</b>\n\n"
                 f"🔗 Ваша ссылка на подключение:\n<code>{sub_link}</code>\n\n"
                 "💳 Чтобы снова получить доступ, выберите срок продления подписки:",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=reply_buttons)
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=reply_buttons),
+                parse_mode="HTML"
             )
         else:
             await message.answer(
@@ -82,12 +85,15 @@ async def start_handler(message: Message, command: CommandObject):
                 f"📅 Ваша подписка активна до: <b>{expiry_str}</b>\n"
                 f"🔗 Ваша ссылка для подключения:\n<code>{sub_link}</code>\n\n"
                 "⏰ Я напомню о необходимости продления за день до окончания срока действия подписки.",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=reply_buttons)
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=reply_buttons),
+                parse_mode="HTML"
             )
+
     else:
         trial_kb = InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="Получить доступ", callback_data="get_trial")],
+                [InlineKeyboardButton(text="🎁 Реферальная система", callback_data="ref_menu")],
                 [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
             ]
         )
