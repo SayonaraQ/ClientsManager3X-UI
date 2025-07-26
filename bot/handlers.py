@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from dateutil.relativedelta import relativedelta
 from bot.sync import sync_to_google_sheets
+from bot import referrals
 from bot.api import find_user_by_tg, add_trial_user, get_inbounds, update_user_expiry, get_all_clients
 from bot.utils import generate_uuid, generate_sub_id, generate_email, generate_expiry, get_expiry_datetime, is_admin
 from yookassa import Configuration, Payment
@@ -24,15 +25,31 @@ SUB_LINK_TEMPLATE = os.getenv("SUB_LINK_TEMPLATE")
 Configuration.account_id = os.getenv("YOOKASSA_SHOP_ID")
 Configuration.secret_key = os.getenv("YOOKASSA_SECRET_KEY")
 
-# /start команда
-@router.message(Command("start"))
-async def start_handler(message: Message):
+@router.message(CommandStart(deep_link=True))
+async def start_handler(message: Message, command: CommandObject):
     tg_id = message.from_user.id
     user = await find_user_by_tg(tg_id)
-
     now = datetime.now(ZoneInfo("Europe/Moscow"))
+
+    if not user and command.args and command.args.startswith("ref_"):
+        ref_code = command.args.replace("ref_", "")
+        gc = referrals.gspread.service_account(filename=os.getenv("GOOGLE_CREDENTIALS_PATH"))
+        sh = gc.open(referrals.SPREADSHEET_NAME)
+        ws = sh.worksheet(referrals.SHEET_TAB)
+
+        rows = ws.get_all_values()
+        inviter_tg_id = None
+        for row in rows:
+            if row[2] == ref_code:
+                inviter_tg_id = int(row[0])
+                break
+
+        if inviter_tg_id and inviter_tg_id != tg_id:
+            referrals.save_referral(inviter_tg_id, tg_id, ref_code)
+
     reply_buttons = [
         [InlineKeyboardButton(text="🔎 Проверить статус", callback_data="check_status")],
+        [InlineKeyboardButton(text="🎁 Реферальная система", callback_data="ref_menu")],
         [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
     ]
 
@@ -67,7 +84,6 @@ async def start_handler(message: Message):
                 "⏰ Я напомню о необходимости продления за день до окончания срока действия подписки.",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=reply_buttons)
             )
-
     else:
         trial_kb = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -80,7 +96,6 @@ async def start_handler(message: Message):
             "Хотите получить бесплатный пробный доступ на 3 дня?",
             reply_markup=trial_kb
         )
-
 
 # Кнопка получения триала
 @router.callback_query(F.data == "get_trial")
@@ -445,3 +460,46 @@ async def handle_broadcast(message: Message, command: CommandObject):
 async def sync_command(message: Message, bot: Bot):
     await sync_to_google_sheets(bot)
     await message.answer("✅ Синхронизация таблицы завершена.")
+
+#refferal-system
+@router.callback_query(F.data == "ref_menu")
+async def handle_ref_menu(callback: CallbackQuery):
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="📎 Моя ссылка для друга", callback_data="ref_link")],
+            [InlineKeyboardButton(text="👥 Мои рефералы", callback_data="my_referrals")]
+        ]
+    )
+    await callback.answer()
+    await callback.message.answer("🎁 Реферальная система:", reply_markup=kb)
+
+@router.callback_query(F.data == "ref_link")
+async def handle_ref_link(callback: CallbackQuery):
+    await callback.answer()
+    await referrals.send_referral_link(callback.bot, callback.from_user.id, callback.message.chat.id)
+
+@router.callback_query(F.data == "my_referrals")
+async def handle_my_referrals(callback: CallbackQuery, bot: Bot):
+    referrals_list = referrals.get_referrals_by_inviter(callback.from_user.id)
+
+    await callback.answer()
+    if not referrals_list:
+        await callback.message.answer("🤷 У вас пока нет приглашённых.")
+        return
+
+    text = "👥 Ваши приглашённые:\n\n"
+    for item in referrals_list:
+        try:
+            user = await bot.get_chat(int(item["tg_id"]))
+            username = f"@{user.username}" if user.username else f"<code>{item['tg_id']}</code>"
+        except Exception:
+            username = f"<code>{item['tg_id']}</code>"
+
+        try:
+            formatted_date = datetime.strptime(item["date"], "%Y-%m-%d %H:%M").strftime("%d.%m.%Y")
+        except Exception:
+            formatted_date = item["date"]
+
+        text += f"• {username} — {formatted_date}\n"
+
+    await callback.message.answer(text, parse_mode="HTML")
