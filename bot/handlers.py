@@ -309,6 +309,7 @@ async def poll_payment_status(callback: CallbackQuery, user: dict, price_info: d
             if not expiry_now or expiry_now < now:
                 expiry_now = now
 
+            base_date = expiry_now.replace(hour=0, minute=0, second=0, microsecond=0)
             new_expiry = expiry_now + relativedelta(months=+months)
             new_expiry = new_expiry.replace(hour=23, minute=59, second=59, microsecond=0)
 
@@ -397,6 +398,7 @@ async def successful_payment_handler(message: Message):
     if not expiry_now or expiry_now < now:
         expiry_now = now
 
+    base_date = expiry_now.replace(hour=0, minute=0, second=0, microsecond=0)
     new_expiry = expiry_now + relativedelta(months=+months)
     new_expiry = new_expiry.replace(hour=23, minute=59, second=59, microsecond=0)
 
