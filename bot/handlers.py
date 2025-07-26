@@ -310,7 +310,7 @@ async def poll_payment_status(callback: CallbackQuery, user: dict, price_info: d
                 expiry_now = now
 
             base_date = expiry_now.replace(hour=0, minute=0, second=0, microsecond=0)
-            new_expiry = expiry_now + relativedelta(months=+months)
+            new_expiry = base_date + relativedelta(months=+months)
             new_expiry = new_expiry.replace(hour=23, minute=59, second=59, microsecond=0)
 
             success = await update_user_expiry(
@@ -342,7 +342,7 @@ async def poll_payment_status(callback: CallbackQuery, user: dict, price_info: d
 async def handle_buy_subscription(callback: CallbackQuery):
     plan = callback.data.split("_")[1]
     prices = {
-        "1m": {"amount": 2000, "label": "1 месяц", "months": 1},
+        "1m": {"amount": 20000, "label": "1 месяц", "months": 1},
         "3m": {"amount": 60000, "label": "3 месяца", "months": 3},
         "6m": {"amount": 120000, "label": "6 месяцев", "months": 6}
     }
@@ -399,7 +399,7 @@ async def successful_payment_handler(message: Message):
         expiry_now = now
 
     base_date = expiry_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    new_expiry = expiry_now + relativedelta(months=+months)
+    new_expiry = base_date + relativedelta(months=+months)
     new_expiry = new_expiry.replace(hour=23, minute=59, second=59, microsecond=0)
 
     success = await update_user_expiry(
