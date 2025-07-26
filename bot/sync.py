@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from .api import get_all_clients
 from gspread_formatting import Color
-from referrals import export_to_gsheet
+from bot.referrals import export_to_gsheet
 
 # Загрузка .env
 load_dotenv()
