@@ -9,6 +9,7 @@ from aiogram.enums import ContentType
 from aiogram.filters import Command, CommandObject
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
+from dateutil.relativedelta import relativedelta
 from bot.sync import sync_to_google_sheets
 from bot.api import find_user_by_tg, add_trial_user, get_inbounds, update_user_expiry, get_all_clients
 from bot.utils import generate_uuid, generate_sub_id, generate_email, generate_expiry, get_expiry_datetime, is_admin
@@ -218,7 +219,7 @@ async def handle_sbp(callback: CallbackQuery):
 async def handle_sbp_payment(callback: CallbackQuery):
     plan = callback.data.split("_")[1]
     prices = {
-        "1m": {"value": "200.00", "label": "1 месяц", "months": 1},
+        "1m": {"value": "20.00", "label": "1 месяц", "months": 1},
         "3m": {"value": "600.00", "label": "3 месяца", "months": 3},
         "6m": {"value": "1200.00", "label": "6 месяцев", "months": 6}
     }
@@ -308,7 +309,7 @@ async def poll_payment_status(callback: CallbackQuery, user: dict, price_info: d
             if not expiry_now or expiry_now < now:
                 expiry_now = now
 
-            new_expiry = expiry_now + timedelta(days=30 * months)
+            new_expiry = expiry_now + relativedelta(months=+months)
             new_expiry = new_expiry.replace(hour=23, minute=59, second=59, microsecond=0)
 
             success = await update_user_expiry(
@@ -340,7 +341,7 @@ async def poll_payment_status(callback: CallbackQuery, user: dict, price_info: d
 async def handle_buy_subscription(callback: CallbackQuery):
     plan = callback.data.split("_")[1]
     prices = {
-        "1m": {"amount": 20000, "label": "1 месяц", "months": 1},
+        "1m": {"amount": 2000, "label": "1 месяц", "months": 1},
         "3m": {"amount": 60000, "label": "3 месяца", "months": 3},
         "6m": {"amount": 120000, "label": "6 месяцев", "months": 6}
     }
@@ -396,7 +397,7 @@ async def successful_payment_handler(message: Message):
     if not expiry_now or expiry_now < now:
         expiry_now = now
 
-    new_expiry = expiry_now + timedelta(days=30 * months)
+    new_expiry = expiry_now + relativedelta(months=+months)
     new_expiry = new_expiry.replace(hour=23, minute=59, second=59, microsecond=0)
 
     success = await update_user_expiry(
