@@ -1,3 +1,8 @@
+import os
+import aiohttp
+import uuid
+import asyncio
+import time
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, PreCheckoutQuery, ShippingOption, ContentType
 from aiogram.enums import ContentType
@@ -5,15 +10,18 @@ from aiogram.filters import Command, CommandObject
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from bot.sync import sync_to_google_sheets
-import os
 from bot.api import find_user_by_tg, add_trial_user, get_inbounds, update_user_expiry, get_all_clients
 from bot.utils import generate_uuid, generate_sub_id, generate_email, generate_expiry, get_expiry_datetime, is_admin
+from yookassa import Configuration, Payment
 
 router = Router()
+active_payments = {}
 
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_ID", "").split(",") if x.strip()]
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 SUB_LINK_TEMPLATE = os.getenv("SUB_LINK_TEMPLATE")
+Configuration.account_id = os.getenv("YOOKASSA_SHOP_ID")
+Configuration.secret_key = os.getenv("YOOKASSA_SECRET_KEY")
 
 # /start команда
 @router.message(Command("start"))
@@ -166,10 +174,23 @@ async def handle_check_status(callback: CallbackQuery):
             )
         )
 
-
-# Новые кнопки оплаты
+# --- Новые кнопки выбора способа оплаты ---
 @router.callback_query(F.data == "renew_subscription")
 async def handle_renew_subscription(callback: CallbackQuery):
+    await callback.answer()
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="💳 Банковская карта / SberPay", callback_data="choose_tgpay"),
+                InlineKeyboardButton(text="📲 Оплата по СБП", callback_data="choose_sbp")
+            ]
+        ]
+    )
+    await callback.message.answer("💰 Выберите способ оплаты:", reply_markup=kb)
+
+# --- Кнопки после выбора способа ---
+@router.callback_query(F.data == "choose_tgpay")
+async def handle_tgpay(callback: CallbackQuery):
     await callback.answer()
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -179,6 +200,138 @@ async def handle_renew_subscription(callback: CallbackQuery):
         ]
     )
     await callback.message.answer("💳 Выберите срок продления подписки:", reply_markup=kb)
+
+@router.callback_query(F.data == "choose_sbp")
+async def handle_sbp(callback: CallbackQuery):
+    await callback.answer()
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="1 месяц (200₽)", callback_data="sbp_1m")],
+            [InlineKeyboardButton(text="3 месяца (600₽)", callback_data="sbp_3m")],
+            [InlineKeyboardButton(text="6 месяцев (1200₽)", callback_data="sbp_6m")],
+        ]
+    )
+    await callback.message.answer("📲 Выберите срок подписки для оплаты по СБП:", reply_markup=kb)
+
+# --- Обработка СБП оплаты ---
+@router.callback_query(F.data.startswith("sbp_"))
+async def handle_sbp_payment(callback: CallbackQuery):
+    plan = callback.data.split("_")[1]
+    prices = {
+        "1m": {"value": "200.00", "label": "1 месяц", "months": 1},
+        "3m": {"value": "600.00", "label": "3 месяца", "months": 3},
+        "6m": {"value": "1200.00", "label": "6 месяцев", "months": 6}
+    }
+
+    if plan not in prices:
+        await callback.answer("❌ Неверный план", show_alert=True)
+        return
+
+    user = await find_user_by_tg(callback.from_user.id)
+    if not user:
+        await callback.answer("❌ Пользователь не найден", show_alert=True)
+        return
+
+    await callback.answer()
+
+    sbp_link, payment_id = await create_sbp_payment(callback.from_user.id, plan, prices[plan])
+    if not sbp_link:
+        await callback.message.answer("❌ Ошибка при создании платежа. Попробуйте позже.")
+        return
+
+    await callback.message.answer(
+        f"📲 Для оплаты по СБП нажмите на кнопку ниже:",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="Оплатить через СБП", url=sbp_link)]]
+        )
+    )
+
+    await poll_payment_status(callback, user, prices[plan], payment_id)
+
+# --- Создание платежа через API ЮKassa ---
+async def create_sbp_payment(tg_id: int, plan: str, price_info: dict):
+
+    old_payment_id = active_payments.get(tg_id)
+    if old_payment_id:
+        try:
+            payment = Payment.find_one(old_payment_id)
+            if payment.status in ["pending", "waiting_for_capture"]:
+                print(f"[sbp] Повторный вызов платежа {old_payment_id}")
+                return payment.confirmation.confirmation_url, old_payment_id
+        except Exception as e:
+            print(f"[sbp] Ошибка при проверке старого платежа: {e}")
+
+    receipt = {
+        "customer": {"full_name": f"User {tg_id}"},
+        "items": [
+            {
+                "description": f"Подписка на {price_info['label']}",
+                "quantity": 1.0,
+                "amount": {"value": price_info["value"], "currency": "RUB"},
+                "vat_code": 1
+            }
+        ]
+    }
+
+    try:
+        new_payment = Payment.create({
+            "amount": {"value": price_info["value"], "currency": "RUB"},
+            "payment_method_data": {"type": "sbp"},
+            "confirmation": {"type": "redirect", "return_url": "https://t.me/nullcorevpn_bot"},
+            "capture": True,
+            "description": f"Подписка на {price_info['label']}",
+            "metadata": {"tg_id": str(tg_id), "plan": plan},
+            "receipt": receipt
+        }, uuid.uuid4().hex)
+
+        # Сохраняем активный payment_id
+        active_payments[tg_id] = new_payment.id
+
+        return new_payment.confirmation.confirmation_url, new_payment.id
+
+    except Exception as e:
+        print("[sbp] Ошибка создания платежа:", e)
+        return None, None
+
+# --- Polling статуса ---
+async def poll_payment_status(callback: CallbackQuery, user: dict, price_info: dict, payment_id: str):
+    max_attempts = 60
+    for attempt in range(max_attempts):
+        payment = Payment.find_one(payment_id)
+        if payment.status == "succeeded":
+            months = price_info["months"]
+            now = datetime.now(ZoneInfo("Europe/Moscow"))
+            expiry_now = get_expiry_datetime(user["expiryTime"])
+            if not expiry_now or expiry_now < now:
+                expiry_now = now
+
+            new_expiry = expiry_now + timedelta(days=30 * months)
+            new_expiry = new_expiry.replace(hour=23, minute=59, second=59, microsecond=0)
+
+            success = await update_user_expiry(
+                user["inbound_id"],
+                user["client"]["id"],
+                int(new_expiry.astimezone(timezone.utc).timestamp() * 1000)
+            )
+
+            # Удаляем активный платёж
+            active_payments.pop(callback.from_user.id, None)
+
+            if success:
+                await callback.message.answer(
+                    f"✅ Подписка по СБП продлена до <b>{new_expiry.strftime('%d.%m.%Y %H:%M')}</b>"
+                )
+            else:
+                await callback.message.answer(
+                    "❌ Не удалось продлить подписку после оплаты. Обратитесь к администратору.")
+            return
+
+        elif payment.status in ["canceled", "waiting_for_capture"]:
+            active_payments.pop(callback.from_user.id, None)
+
+        await asyncio.sleep(5)
+
+    await callback.message.answer("⏳ Время ожидания истекло. Оплата не подтверждена.")
 
 @router.callback_query(F.data.startswith("buy_"))
 async def handle_buy_subscription(callback: CallbackQuery):
