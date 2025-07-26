@@ -262,7 +262,10 @@ async def create_sbp_payment(tg_id: int, plan: str, price_info: dict):
             print(f"[sbp] Ошибка при проверке старого платежа: {e}")
 
     receipt = {
-        "customer": {"full_name": f"User {tg_id}"},
+        "customer": {
+            "full_name": f"User {tg_id}",
+            "email": f"user{tg_id}@null.core"  # или любой другой технический домен
+        },
         "items": [
             {
                 "description": f"Подписка на {price_info['label']}",
