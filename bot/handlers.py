@@ -219,7 +219,7 @@ async def handle_sbp(callback: CallbackQuery):
 async def handle_sbp_payment(callback: CallbackQuery):
     plan = callback.data.split("_")[1]
     prices = {
-        "1m": {"value": "20.00", "label": "1 месяц", "months": 1},
+        "1m": {"value": "200.00", "label": "1 месяц", "months": 1},
         "3m": {"value": "600.00", "label": "3 месяца", "months": 3},
         "6m": {"value": "1200.00", "label": "6 месяцев", "months": 6}
     }
@@ -324,7 +324,7 @@ async def poll_payment_status(callback: CallbackQuery, user: dict, price_info: d
 
             if success:
                 await callback.message.answer(
-                    f"✅ Подписка по СБП продлена до <b>{new_expiry.strftime('%d.%m.%Y %H:%M')}</b>"
+                    f"✅ Подписка продлена до <b>{new_expiry.strftime('%d.%m.%Y %H:%M')}</b>"
                 )
             else:
                 await callback.message.answer(
