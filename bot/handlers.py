@@ -6,7 +6,7 @@ import time
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, PreCheckoutQuery, ShippingOption, ContentType
 from aiogram.enums import ContentType
-from aiogram.filters import Command, CommandObject
+from aiogram.filters import Command, CommandObject, CommandStart
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from dateutil.relativedelta import relativedelta
