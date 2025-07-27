@@ -12,7 +12,7 @@ SPREADSHEET_NAME = os.getenv("SPREADSHEET_NAME")
 SHEET_TAB = os.getenv("SHEET_TAB_REF")
 CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH")
 
-DB_PATH = "referrals.db"
+DB_PATH = os.path.join("data", "referrals.db")
 
 
 # Подключение к SQLite
@@ -103,7 +103,8 @@ async def send_referral_link(bot, user_id, chat_id):
     await bot.send_message(
         chat_id,
         f"👥 Пригласите друзей и получите бонусы!\n"
-        f"Ваша реферальная ссылка:\n\n<code>{ref_link}</code>\n\n"
+        f"Ваша реферальная ссылка:\n\n"
+        f'<a href="{ref_link}">{ref_link}</a>\n\n'
         f"🎁 5 приглашённых и оплативших подписку друзей = 1 месяц бесплатно для тебя\n"
         f"🎁 10 — 2 месяца и т.д.",
         parse_mode="HTML"

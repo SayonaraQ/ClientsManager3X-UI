@@ -9,3 +9,4 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - ./data/uploads:/app/data/uploads
+      - ./data/referrals.db:/app/data/referrals.db
