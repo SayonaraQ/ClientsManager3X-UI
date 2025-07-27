@@ -123,6 +123,7 @@ async def handle_get_trial(callback: CallbackQuery):
         f"✅ Используйте её в вашем VPN-клиенте.\n"
         f"Инструкция по подключению: https://telegra.ph/Instrukciya-po-nastrojke-nashego-VPN-09-11-2\n\n"
         f"Стоимость подписки после пробного периода — 200р/месяц\n\n"
+        f"Использовать одну ссылку можно одновременно на двух устройствах\n\n"
         f"По любым вопросам можно обращаться к <a href='https://t.me/{ADMIN_USERNAME}'>админу</a>.",
         disable_web_page_preview=True,
         reply_markup=InlineKeyboardMarkup(
