@@ -3,6 +3,7 @@ import random
 import string
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
+from pathlib import Path
 
 def generate_uuid() -> str:
     return str(uuid.uuid4())
@@ -46,3 +47,10 @@ def timestamp_to_date(ts: int) -> str:
         return dt.strftime("%d.%m.%Y %H:%M")
     except Exception:
         return "неизвестно"
+
+def load_terms_text() -> str:
+    terms_path = Path(__file__).parent / "terms.txt"
+    try:
+        return terms_path.read_text(encoding="utf-8")
+    except Exception:
+        return "⚠️ Правила временно недоступны."

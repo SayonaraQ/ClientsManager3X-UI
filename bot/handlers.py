@@ -14,7 +14,7 @@ from bot.referrals import export_to_gsheet
 from bot.sync import sync_to_google_sheets
 from bot import referrals
 from bot.api import find_user_by_tg, add_trial_user, get_inbounds, update_user_expiry, get_all_clients
-from bot.utils import generate_uuid, generate_sub_id, generate_email, generate_expiry, get_expiry_datetime, is_admin
+from bot.utils import generate_uuid, generate_sub_id, generate_email, generate_expiry, get_expiry_datetime, is_admin, load_terms_text
 from yookassa import Configuration, Payment
 
 router = Router()
@@ -42,6 +42,7 @@ async def start_handler(message: Message, command: CommandObject):
     reply_buttons = [
         [InlineKeyboardButton(text="🔎 Проверить статус", callback_data="check_status")],
         [InlineKeyboardButton(text="🎁 Реферальная система", callback_data="ref_menu")],
+        [InlineKeyboardButton(text="📜 Правила", callback_data="rules")]
         [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
     ]
 
@@ -500,3 +501,12 @@ async def handle_my_referrals(callback: CallbackQuery, bot: Bot):
         text += f"• {username} — {formatted_date}\n"
 
     await callback.message.answer(text, parse_mode="HTML")
+
+@router.callback_query(F.data == "rules")
+async def rules_callback(callback: CallbackQuery):
+    terms = load_terms_text()
+
+    for chunk in [terms[i:i+4000] for i in range(0, len(terms), 4000)]:
+        await callback.message.answer(chunk)
+
+    await callback.answer()
