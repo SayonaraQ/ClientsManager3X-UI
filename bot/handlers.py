@@ -337,6 +337,7 @@ async def poll_payment_status(callback: CallbackQuery, user: dict, price_info: d
             active_payments.pop(callback.from_user.id, None)
 
             if success:
+                referrals.mark_as_paid(callback.from_user.id)
                 await callback.message.answer(
                     f"✅ Подписка продлена до <b>{new_expiry.strftime('%d.%m.%Y %H:%M')}</b>"
                 )
@@ -423,6 +424,7 @@ async def successful_payment_handler(message: Message):
     )
 
     if success:
+        referrals.mark_as_paid(message.from_user.id)
         await message.answer(f"✅ Подписка продлена до <b>{new_expiry.strftime('%d.%m.%Y %H:%M')}</b>")
     else:
         await message.answer("❌ Не удалось продлить подписку. Обратитесь к администратору.")
