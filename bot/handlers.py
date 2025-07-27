@@ -486,7 +486,7 @@ async def handle_my_referrals(callback: CallbackQuery, bot: Bot):
 
     await callback.answer()
     if not referrals_list:
-        await callback.message.answer("🤷 У вас пока нет приглашённых.")
+        await callback.message.answer("🤷 У вас пока нет приглашённых. Они появятся после первой оплаты.")
         return
 
     text = "👥 Ваши приглашённые:\n\n"

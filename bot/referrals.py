@@ -106,7 +106,7 @@ async def send_referral_link(bot, user_id, chat_id):
         f"👥 Пригласите друзей и получите бонусы!\n"
         f"Ваша реферальная ссылка:\n\n"
         f'<a href="{ref_link}">{ref_link}</a>\n\n'
-        f'🚀Отправьте ссылку друзьям — приглашённые отобразятся в разделе "Мои рефералы“\n\n'
+        f'🚀Отправьте ссылку друзьям — приглашённые отобразятся в разделе "Мои рефералы“ после оплаты.\n\n'
         f"🎁 5 приглашённых и оплативших подписку друзей = 1 месяц бесплатной подписки\n"
         f"🎁 10 — 2 месяца и т.д.",
         parse_mode="HTML"
@@ -123,7 +123,7 @@ async def export_to_gsheet():
     sh = gc.open(SPREADSHEET_NAME)
     ws = sh.worksheet(SHEET_TAB)
     ws.clear()
-    ws.append_row(["inviter_tg_id", "invited_tg_id", "ref_code", "created_at", "bonus_status"])
+    ws.append_row(["inviter_tg_id", "invited_tg_id", "ref_code", "created_at", "bonus_status", "is_paid"])
 
     for row in rows:
         ws.append_row([str(col) if col is not None else "" for col in row])
