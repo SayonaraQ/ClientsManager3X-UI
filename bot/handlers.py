@@ -42,7 +42,7 @@ async def start_handler(message: Message, command: CommandObject):
     reply_buttons = [
         [InlineKeyboardButton(text="🔎 Проверить статус", callback_data="check_status")],
         [InlineKeyboardButton(text="🎁 Реферальная система", callback_data="ref_menu")],
-        [InlineKeyboardButton(text="📜 Правила", callback_data="rules")]
+        [InlineKeyboardButton(text="📜 Правила", callback_data="rules")],
         [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
     ]
 
