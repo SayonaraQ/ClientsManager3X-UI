@@ -85,6 +85,7 @@ async def start_handler(message: Message, command: CommandObject):
             inline_keyboard=[
                 [InlineKeyboardButton(text="Получить доступ", callback_data="get_trial")],
                 [InlineKeyboardButton(text="🎁 Реферальная система", callback_data="ref_menu")],
+                [InlineKeyboardButton(text="📜 Правила", callback_data="rules")],
                 [InlineKeyboardButton(text="💬 Связаться с админом", url=f"https://t.me/{ADMIN_USERNAME}")]
             ]
         )
@@ -507,6 +508,6 @@ async def rules_callback(callback: CallbackQuery):
     terms = load_terms_text()
 
     for chunk in [terms[i:i+4000] for i in range(0, len(terms), 4000)]:
-        await callback.message.answer(chunk)
+        await callback.message.answer(chunk, parse_mode="HTML")
 
     await callback.answer()
