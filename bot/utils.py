@@ -49,7 +49,7 @@ def timestamp_to_date(ts: int) -> str:
         return "неизвестно"
 
 def load_terms_text() -> str:
-    terms_path = Path(__file__).parent / "terms.txt"
+    terms_path = Path(__file__).parent.parent / "terms.txt"
     try:
         return terms_path.read_text(encoding="utf-8")
     except Exception:
