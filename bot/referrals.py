@@ -24,8 +24,8 @@ def get_conn():
             invited_tg_id TEXT,
             ref_code TEXT,
             created_at TEXT,
-            bonus_status TEXT DEFAULT 'Нет бонуса'
-            paid INTEGER DEFAULT 0
+            bonus_status TEXT DEFAULT 'Нет бонуса',
+            is_paid INTEGER DEFAULT 0
         )
     ''')
     return conn
@@ -82,7 +82,7 @@ def get_referrals_by_inviter(inviter_tg_id: int) -> list[dict]:
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT invited_tg_id, created_at, bonus_status FROM referrals WHERE inviter_tg_id = ? AND paid = 1", (str(inviter_tg_id),))
+    cursor.execute("SELECT invited_tg_id, created_at, bonus_status FROM referrals WHERE inviter_tg_id = ? AND is_paid = 1", (str(inviter_tg_id),))
     rows = cursor.fetchall()
     conn.close()
 
@@ -141,6 +141,6 @@ def get_inviter_by_code(ref_code: str) -> Optional[int]:
 def mark_as_paid(tg_id: int):
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("UPDATE referrals SET paid = 1 WHERE invited_tg_id = ?", (str(tg_id),))
+    cursor.execute("UPDATE referrals SET is_paid = 1 WHERE invited_tg_id = ?", (str(tg_id),))
     conn.commit()
     conn.close()
